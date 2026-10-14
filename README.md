@@ -10,11 +10,12 @@ External machine learning/deep learning libraries such as **scikit-learn, pandas
 
 ## Project Structure
 
+The tree below shows the intended project layout. Files marked **(planned)** are
+part of the assignment scope but have not been implemented yet.
+
 ```text
-NumCompute/
-│
-├── numcompute/
-│   ├── __init__.py
+.
+├── NumCompute/
 │   ├── io.py
 │   ├── preprocessing.py
 │   ├── sort_search.py
@@ -25,35 +26,33 @@ NumCompute/
 │   ├── pipeline.py
 │   ├── utils.py
 │   └── benchmarking.py
-│
 ├── tests/
 │   ├── test_io.py
-│   ├── test_preprocessing.py
+│   ├── test_preprocessing.py 
 │   ├── test_sort_search.py
 │   ├── test_rank.py
 │   ├── test_stats.py
 │   ├── test_metrics.py
 │   ├── test_optim.py
 │   └── test_pipeline.py
-│
-├── benchmark/
+├── benchmark/ 
 │   └── ...
-│
 ├── demo/
 │   └── quickstart.ipynb
-│
+├── requirements.txt
+├── requirements-dev.txt
+├── pytest.ini
+├── .gitignore
 ├── README.md
-├── CODING_STYLE.md
-├── pyproject.toml
-└── .gitignore
+└── CODING_STYLE.md
 ```
 
 ---
 
 ## Requirements
 
-* Python
-* NumPy
+* Python 3.10 or newer
+* NumPy (installed from `requirements.txt`)
 * Plain Python standard library where required
 
 The assignment does not permit external ML/DL libraries such as:
@@ -306,22 +305,16 @@ The test suite should cover:
 
 The assignment requires **at least 20 unit tests**.
 
-Run all tests:
+After following the installation steps below, run tests from the repository root:
 
 ```bash
-pytest
+python -m pytest
 ```
 
-Run with verbose output:
+Run a specific test file:
 
 ```bash
-pytest -v
-```
-
-Run one test file:
-
-```bash
-pytest tests/test_stats.py
+python -m pytest tests/test_optim.py
 ```
 
 ---
@@ -371,11 +364,11 @@ Benchmark results should include sufficient information to reproduce and interpr
 
 # Installation
 
-Clone the repository:
+Clone the repository and enter its root directory:
 
 ```bash
 git clone <repository-url>
-cd NumCompute
+cd <repository-directory>
 ```
 
 Create a virtual environment:
@@ -398,16 +391,10 @@ source .venv/bin/activate
 .venv\Scripts\activate
 ```
 
-Install the project:
+Install the project dependencies and test tools:
 
 ```bash
-pip install -e .
-```
-
-Install testing and notebook dependencies:
-
-```bash
-pip install pytest jupyter
+python -m pip install -r requirements-dev.txt
 ```
 
 ---
