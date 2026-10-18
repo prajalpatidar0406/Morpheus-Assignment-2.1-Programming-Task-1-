@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "numcompute"
+version = "0.1.0"
+description = "A NumPy-only educational numerical computing toolkit"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+
+[tool.setuptools]
+package-dir = {numcompute = "NumCompute/numcompute"}
+packages = ["numcompute"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "NumCompute"]
+
+[tool.pyright]
+extraPaths = ["NumCompute"]

@@ -29,7 +29,14 @@ def grad(
     -------
     float or numpy.ndarray
         Estimated derivative for a scalar input, or gradient vector
-        for an array input.
+        with the same shape as an array input.
+
+    Raises
+    ------
+    ValueError
+        If h is not positive/finite or method is unsupported.
+
+    Complexity: O(d) function evaluations and O(d) workspace for d inputs.
     """
     if not np.isfinite(h) or h <= 0:
         raise ValueError("h must be positive and finite.")
@@ -86,6 +93,14 @@ def jacobian(
     -------
     numpy.ndarray
         Jacobian matrix with shape (number of outputs, number of inputs).
+
+    Raises
+    ------
+    ValueError
+        If h is not positive/finite or method is unsupported.
+
+    Complexity: O(d) function evaluations (two per input for central mode),
+    O(m*d) output space for m outputs and d inputs.
     """
     if not np.isfinite(h) or h <= 0:
         raise ValueError("h must be positive and finite.")

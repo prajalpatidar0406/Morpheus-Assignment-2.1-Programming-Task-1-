@@ -10,40 +10,41 @@ External machine learning/deep learning libraries such as **scikit-learn, pandas
 
 ## Project Structure
 
-The tree below shows the intended project layout. Files marked **(planned)** are
-part of the assignment scope but have not been implemented yet.
+The tree below shows the project layout and assignment modules.
 
 ```text
 .
 ├── NumCompute/
-│   ├── io.py
-│   ├── preprocessing.py
-│   ├── sort_search.py
-│   ├── rank.py
-│   ├── stats.py
-│   ├── metrics.py
-│   ├── optim.py
-│   ├── pipeline.py
-│   ├── utils.py
-│   └── benchmarking.py
+│   └── numcompute/
+│       ├── __init__.py
+│       ├── io.py
+│       ├── preprocessing.py
+│       ├── sort_search.py
+│       ├── rank.py
+│       ├── stats.py
+│       ├── metrics.py
+│       ├── optim.py
+│       ├── pipeline.py
+│       ├── utils.py
+│       └── benchmarking.py
 ├── tests/
 │   ├── test_io.py
 │   ├── test_preprocessing.py 
 │   ├── test_sort_search.py
-│   ├── test_rank.py
-│   ├── test_stats.py
+│   ├── test_rank_stats.py
 │   ├── test_metrics.py
 │   ├── test_optim.py
-│   └── test_pipeline.py
-├── benchmark/ 
-│   └── ...
+│   ├── test_pipeline.py
+│   ├── test_utils.py
+│   ├── test_benchmarking.py
+│   └── test_streaming_and_package.py
 ├── demo/
 │   └── quickstart.ipynb
 ├── requirements.txt
 ├── requirements-dev.txt
-├── pytest.ini
 ├── .gitignore
 ├── README.md
+├── pyproject.toml
 └── CODING_STYLE.md
 ```
 
@@ -61,6 +62,14 @@ The assignment does not permit external ML/DL libraries such as:
 * pandas
 * PyTorch
 
+Install the package from the repository root:
+
+```bash
+python -m pip install .
+```
+
+The importable and installable package name is `numcompute`.
+
 ---
 
 ## Modules
@@ -71,10 +80,13 @@ CSV data loading using NumPy.
 
 Supports:
 
-* CSV loading with `numpy.loadtxt` or `numpy.genfromtxt`
-* Custom delimiters, such as comma or tab
-* Missing-value handling
-* Returning data as NumPy arrays
+* `load_csv(path, ...) -> (header, data)` for complete-table loading
+* `iter_csv(path, chunksize=1000, ...)` for bounded-memory iteration
+* Custom delimiters, requested or inferred dtypes, and fill/drop missing modes
+* Numeric arrays for numeric tables and object arrays for mixed columns
+
+`load_csv` returns the column names and a 2D NumPy array using
+`numpy.loadtxt`. Use `iter_csv` to process data in bounded-memory chunks.
 
 ---
 
@@ -85,7 +97,7 @@ Preprocessing components:
 * `StandardScaler`
 * `MinMaxScaler`
 * `OneHotEncoder`
-* Optional simple imputer for replacing NaN values with a constant
+* `Imputer` for replacing NaN or configured missing-value markers
 
 Preprocessors use:
 
@@ -162,8 +174,9 @@ Basic statistical functions:
 * Maximum
 * Histogram
 * Quantiles
-* NaN handling
-* Axis-wise statistics
+* NaN-aware batch statistics and exact quantiles
+* `StreamingStats`, which merges batches with Welford's algorithm using O(p)
+  memory for p features
 
 Functions should have clearly defined input and output dimensions when using `axis`.
 
@@ -195,6 +208,10 @@ auc(x, y)
 ```
 
 for binary classification.
+
+Precision, recall, and F1 support binary, micro, macro, and support-weighted
+averaging. Confusion-matrix rows represent true labels and columns represent
+predicted labels.
 
 ---
 
@@ -246,19 +263,16 @@ predict(X)
 
 No machine learning model implementation is required.
 
-The module also provides pipeline chaining.
+The module also provides pipeline chaining, `Compose` for sequential
+transformers, and `FeatureUnion` for concatenating independent feature outputs.
 
 Example:
 
 ```python
 from numcompute.pipeline import Pipeline
-from numcompute.preprocessing import StandardScaler, OneHotEncoder
+from numcompute.preprocessing import StandardScaler
 
-pipe = Pipeline([
-    ("scale", StandardScaler()),
-    ("encode", OneHotEncoder())
-])
-
+pipe = Pipeline([("scale", StandardScaler())])
 X_tr = pipe.fit_transform(X)
 ```
 
@@ -274,9 +288,13 @@ Utilities should only be added here when they are genuinely reusable across mult
 
 ### `benchmarking.py`
 
-Contains reusable benchmarking functionality for measuring implementation performance.
+Contains reusable micro-benchmarking functionality for measuring implementation
+performance.
 
-The benchmark directory contains the actual benchmark scripts.
+`benchmark(function, ..., repeats=5, warmup=1)` returns minimum, median, and
+mean elapsed times in seconds plus Python, NumPy, OS/platform, processor, and
+CPU-count metadata. `compare()` benchmarks named implementations with shared
+arguments, and `format_table()` renders timing and environment information.
 
 ---
 
@@ -303,7 +321,9 @@ The test suite should cover:
 * Different values of `k`
 * Non-contiguous arrays where applicable
 
-The assignment requires **at least 20 unit tests**.
+The test suite contains over 100 unit tests, including invalid shapes, missing
+values, ties, duplicate values, `k` boundaries, empty inputs, non-contiguous
+optimization inputs, and chunked data.
 
 After following the installation steps below, run tests from the repository root:
 
@@ -327,7 +347,7 @@ The end-to-end demonstration is located at:
 demo/quickstart.ipynb
 ```
 
-The demo should demonstrate the implemented functionality, including:
+The demo demonstrates the implemented functionality, including:
 
 1. CSV loading
 2. Preprocessing
@@ -344,13 +364,7 @@ The notebook should use the functions and classes from the `numcompute` package 
 
 # Benchmark
 
-Benchmark scripts are located in:
-
-```text
-benchmark/
-```
-
-The benchmarks should compare relevant implementations, particularly:
+The quickstart notebook compares implementations, particularly:
 
 ```text
 Python loops
@@ -358,7 +372,20 @@ Python loops
 NumPy vectorised implementations
 ```
 
-Benchmark results should include sufficient information to reproduce and interpret the comparison.
+The notebook uses a seeded 200,000-element input, one warm-up, and five timed
+repeats. Its results include median and minimum seconds and the runtime
+environment. Measurements depend on machine and system load; rerun to measure
+your system. `format_table(compare(...))` generates current results rather than
+relying on fixed timing claims.
+
+Example local measurement (Python 3.13.7, NumPy 2.5.4, macOS 27.0.1,
+arm64, 10 reported CPUs; seeded 200,000-element input, one warm-up and five
+timed repeats):
+
+| Implementation | Median (s) | Minimum (s) |
+|---|---:|---:|
+| Python loop | 0.00737 | 0.00692 |
+| NumPy vectorised | 0.0000735 | 0.0000306 |
 
 ---
 
@@ -395,13 +422,15 @@ Install the project dependencies and test tools:
 
 ```bash
 python -m pip install -r requirements-dev.txt
+python -m pip install .
+python -m pip install jupyter
 ```
 
 ---
 
 # Running the Demo
 
-Start Jupyter:
+Install Jupyter and start it:
 
 ```bash
 jupyter notebook

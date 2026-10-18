@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from optim import grad, jacobian
+from numcompute.optim import grad, jacobian
 
 
 # Scalar gradients should work for positive, negative, and zero-valued points.
