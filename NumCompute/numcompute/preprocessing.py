@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def _check_1d_array(X):
     """
     Ensure the input is a 1D NumPy array.
@@ -19,37 +20,22 @@ def _check_1d_array(X):
     ValueError
         If the input is not 1D.
     """
-    X_arr = np.array(X, copy=False)
+    X_arr = np.asarray(X)
     if X_arr.ndim != 1:
         raise ValueError(f"X must be a 1D array. Received shape {X_arr.shape}.")
     return X_arr
+
 
 def _check_is_fitted(estimator, attributes):
     """Check if the estimator has been fitted by verifying necessary attributes."""
     for attr in attributes:
         if not hasattr(estimator, attr):
-            raise ValueError(f"This {estimator.__class__.__name__} instance is not fitted yet. Call 'fit' first.")
+            raise ValueError(
+                f"This {estimator.__class__.__name__} instance is not fitted yet. Call 'fit' first."
+            )
 
-#Remove base estimator
-class BaseEstimator:
-    """Base class for all estimators in the NumCompute framework."""
-    def fit_transform(self, X):
-        """
-        Fit to data, then transform it.
-        
-        Parameters
-        ----------
-        X : np.ndarray
-            Input 1D data.
-            
-        Returns
-        -------
-        np.ndarray
-            Transformed array.
-        """
-        return self.fit(X).transform(X)
 
-class StandardScaler(BaseEstimator):
+class StandardScaler:
     """
     Standardize 1D features by removing the mean and scaling to unit variance.
     """
@@ -77,9 +63,8 @@ class StandardScaler(BaseEstimator):
         """
         X_arr = _check_1d_array(X)
         
-        # Calculate scalar mean and std, ignoring NaNs to ensure stability
-        self.mean_ = np.nanmean(X_arr)
-        self.scale_ = np.nanstd(X_arr)
+        self.mean_ = np.mean(X_arr)
+        self.scale_ = np.std(X_arr)
         
         # Prevent division by zero if the feature is completely constant
         if self.scale_ == 0.0:
@@ -111,7 +96,24 @@ class StandardScaler(BaseEstimator):
         
         return (X_arr - self.mean_) / (self.scale_ + self.epsilon)
 
-class MinMaxScaler(BaseEstimator):
+    def fit_transform(self, X):
+        """
+        Fit to data, then transform it.
+        
+        Parameters
+        ----------
+        X : np.ndarray
+            Input 1D data array, shape (n_samples,).
+            
+        Returns
+        -------
+        np.ndarray
+            Standardized 1D array, shape (n_samples,).
+        """
+        return self.fit(X).transform(X)
+
+
+class MinMaxScaler:
     """
     Transform 1D features by scaling to a given range [0, 1].
     """
@@ -139,8 +141,8 @@ class MinMaxScaler(BaseEstimator):
         """
         X_arr = _check_1d_array(X)
         
-        self.data_min_ = np.nanmin(X_arr)
-        self.data_max_ = np.nanmax(X_arr)
+        self.data_min_ = np.min(X_arr)
+        self.data_max_ = np.max(X_arr)
         self.data_range_ = self.data_max_ - self.data_min_
         
         # Prevent division by zero for constant features
@@ -175,24 +177,57 @@ class MinMaxScaler(BaseEstimator):
         min_val, max_val = self.feature_range
         return X_std * (max_val - min_val) + min_val
 
-class Imputer(BaseEstimator):
-    """
-    Imputation transformer for completing missing values (NaNs) in a 1D array.
-    """
-    def __init__(self, strategy='mean', fill_value=0.0):
-        if strategy not in ['mean', 'median', 'constant']:
-            raise ValueError("Strategy must be 'mean', 'median', or 'constant'")
-        self.strategy = strategy
-        self.fill_value = fill_value
-
-    def fit(self, X):
+    def fit_transform(self, X):
         """
-        Learn the imputation scalar value from the training data.
+        Fit to data, then transform it.
         
         Parameters
         ----------
         X : np.ndarray
-            Input 1D data with missing values, shape (n_samples,).
+            Input 1D data array, shape (n_samples,).
+            
+        Returns
+        -------
+        np.ndarray
+            Scaled 1D array, shape (n_samples,).
+        """
+        return self.fit(X).transform(X)
+
+
+class Imputer:
+    """
+    Imputation transformer for completing missing values received directly in a 1D array.
+    
+    Parameters
+    ----------
+    strategy : str, default='mean'
+        The imputation strategy ('mean', 'median', or 'constant').
+    fill_value : float, default=0.0
+        The constant value to replace missing values with when strategy='constant'.
+    missing_values : float or np.nan, default=np.nan
+        The placeholder for the missing values received in the input array.
+    """
+    def __init__(self, strategy='mean', fill_value=0.0, missing_values=np.nan):
+        if strategy not in ['mean', 'median', 'constant']:
+            raise ValueError("Strategy must be 'mean', 'median', or 'constant'")
+        self.strategy = strategy
+        self.fill_value = fill_value
+        self.missing_values = missing_values
+
+    def _get_missing_mask(self, X_arr):
+        """Return a boolean mask indicating where missing_values are located."""
+        if np.isnan(self.missing_values):
+            return np.isnan(X_arr)
+        return X_arr == self.missing_values
+
+    def fit(self, X):
+        """
+        Learn the imputation scalar value from the input 1D array containing missing values.
+        
+        Parameters
+        ----------
+        X : np.ndarray
+            Input 1D data array containing missing values directly, shape (n_samples,).
             
         Returns
         -------
@@ -205,28 +240,29 @@ class Imputer(BaseEstimator):
         Space: O(1)
         """
         X_arr = _check_1d_array(X)
+        mask = self._get_missing_mask(X_arr)
+        valid_data = X_arr[~mask]
         
-        if self.strategy == 'mean':
-            self.statistics_ = np.nanmean(X_arr)
-        elif self.strategy == 'median':
-            self.statistics_ = np.nanmedian(X_arr)
-        elif self.strategy == 'constant':
+        if self.strategy == 'constant':
             self.statistics_ = float(self.fill_value)
-            
-        # Handle case where the entire 1D array is NaN
-        if np.isnan(self.statistics_):
-            self.statistics_ = 0.0
+        elif valid_data.size == 0:
+            # Fallback if the entire 1D input array consists of missing values
+            self.statistics_ = float(self.fill_value)
+        elif self.strategy == 'mean':
+            self.statistics_ = float(np.mean(valid_data))
+        elif self.strategy == 'median':
+            self.statistics_ = float(np.median(valid_data))
             
         return self
 
     def transform(self, X):
         """
-        Replace missing values with the learned statistic.
+        Replace missing values in the input 1D array with the learned statistic.
         
         Parameters
         ----------
         X : np.ndarray
-            Input 1D data with missing values, shape (n_samples,).
+            Input 1D data array containing missing values directly, shape (n_samples,).
             
         Returns
         -------
@@ -239,13 +275,30 @@ class Imputer(BaseEstimator):
         Space: O(n_samples)
         """
         _check_is_fitted(self, ['statistics_'])
-        X_arr = _check_1d_array(X).astype(float, copy=True)
+        X_arr = _check_1d_array(X)
         
-        # Vectorized replacement of NaNs without Python loops
-        mask = np.isnan(X_arr)
+        # Vectorized replacement of missing values without Python loops
+        mask = self._get_missing_mask(X_arr)
         return np.where(mask, self.statistics_, X_arr)
 
-class OneHotEncoder(BaseEstimator):
+    def fit_transform(self, X):
+        """
+        Fit to data, then transform it.
+        
+        Parameters
+        ----------
+        X : np.ndarray
+            Input 1D data with missing values, shape (n_samples,).
+            
+        Returns
+        -------
+        np.ndarray
+            Imputed 1D array, shape (n_samples,).
+        """
+        return self.fit(X).transform(X)
+
+
+class OneHotEncoder:
     """
     Encode a 1D categorical integer feature array into a 2D one-hot matrix.
     Expects input to be non-negative integer categories.
@@ -312,3 +365,19 @@ class OneHotEncoder(BaseEstimator):
             
         # Instant 1-hot creation via advanced NumPy indexing mapping to an identity matrix
         return np.eye(self.categories_)[X_arr]
+
+    def fit_transform(self, X):
+        """
+        Fit to data, then transform it.
+        
+        Parameters
+        ----------
+        X : np.ndarray
+            Input 1D categorical data array, shape (n_samples,).
+            
+        Returns
+        -------
+        np.ndarray
+            One-hot encoded 2D array, shape (n_samples, n_categories).
+        """
+        return self.fit(X).transform(X)
