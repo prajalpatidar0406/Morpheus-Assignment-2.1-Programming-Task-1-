@@ -1,18 +1,20 @@
+from typing import Any, Sequence, Tuple
 import numpy as np
+import numpy.typing as npt
 
 
-def _check_1d_array(X):
+def _check_1d_array(X: npt.ArrayLike) -> npt.NDArray[Any]:
     """
     Ensure the input is a 1D NumPy array.
     
     Parameters
     ----------
-    X : array_like
+    X : npt.ArrayLike
         Input data.
         
     Returns
     -------
-    np.ndarray
+    npt.NDArray[Any]
         A 1D NumPy array.
         
     Raises
@@ -26,7 +28,7 @@ def _check_1d_array(X):
     return X_arr
 
 
-def _check_is_fitted(estimator, attributes):
+def _check_is_fitted(estimator: Any, attributes: Sequence[str]) -> None:
     """Check if the estimator has been fitted by verifying necessary attributes."""
     for attr in attributes:
         if not hasattr(estimator, attr):
@@ -39,16 +41,20 @@ class StandardScaler:
     """
     Standardize 1D features by removing the mean and scaling to unit variance.
     """
-    def __init__(self, epsilon=1e-8):
+    epsilon: float
+    mean_: float
+    scale_: float
+
+    def __init__(self, epsilon: float = 1e-8) -> None:
         self.epsilon = epsilon
 
-    def fit(self, X):
+    def fit(self, X: npt.ArrayLike) -> "StandardScaler":
         """
         Compute the mean and standard deviation to be used for later scaling.
         
         Parameters
         ----------
-        X : np.ndarray
+        X : npt.ArrayLike
             Input 1D data array, shape (n_samples,).
             
         Returns
@@ -63,8 +69,8 @@ class StandardScaler:
         """
         X_arr = _check_1d_array(X)
         
-        self.mean_ = np.mean(X_arr)
-        self.scale_ = np.std(X_arr)
+        self.mean_ = float(np.mean(X_arr))
+        self.scale_ = float(np.std(X_arr))
         
         # Prevent division by zero if the feature is completely constant
         if self.scale_ == 0.0:
@@ -72,18 +78,18 @@ class StandardScaler:
             
         return self
 
-    def transform(self, X):
+    def transform(self, X: npt.ArrayLike) -> npt.NDArray[np.floating[Any]]:
         """
         Apply standardization by centering and scaling.
         
         Parameters
         ----------
-        X : np.ndarray
+        X : npt.ArrayLike
             Input 1D data array, shape (n_samples,).
             
         Returns
         -------
-        np.ndarray
+        npt.NDArray[np.floating[Any]]
             Standardized 1D array, shape (n_samples,).
             
         Complexity
@@ -96,18 +102,18 @@ class StandardScaler:
         
         return (X_arr - self.mean_) / (self.scale_ + self.epsilon)
 
-    def fit_transform(self, X):
+    def fit_transform(self, X: npt.ArrayLike) -> npt.NDArray[np.floating[Any]]:
         """
         Fit to data, then transform it.
         
         Parameters
         ----------
-        X : np.ndarray
+        X : npt.ArrayLike
             Input 1D data array, shape (n_samples,).
             
         Returns
         -------
-        np.ndarray
+        npt.NDArray[np.floating[Any]]
             Standardized 1D array, shape (n_samples,).
         """
         return self.fit(X).transform(X)
@@ -117,16 +123,21 @@ class MinMaxScaler:
     """
     Transform 1D features by scaling to a given range [0, 1].
     """
-    def __init__(self, feature_range=(0, 1)):
+    feature_range: Tuple[float, float]
+    data_min_: float
+    data_max_: float
+    data_range_: float
+
+    def __init__(self, feature_range: Tuple[float, float] = (0.0, 1.0)) -> None:
         self.feature_range = feature_range
 
-    def fit(self, X):
+    def fit(self, X: npt.ArrayLike) -> "MinMaxScaler":
         """
         Compute the minimum and maximum to be used for later scaling.
         
         Parameters
         ----------
-        X : np.ndarray
+        X : npt.ArrayLike
             Input 1D data array, shape (n_samples,).
             
         Returns
@@ -141,8 +152,8 @@ class MinMaxScaler:
         """
         X_arr = _check_1d_array(X)
         
-        self.data_min_ = np.min(X_arr)
-        self.data_max_ = np.max(X_arr)
+        self.data_min_ = float(np.min(X_arr))
+        self.data_max_ = float(np.max(X_arr))
         self.data_range_ = self.data_max_ - self.data_min_
         
         # Prevent division by zero for constant features
@@ -151,18 +162,18 @@ class MinMaxScaler:
             
         return self
 
-    def transform(self, X):
+    def transform(self, X: npt.ArrayLike) -> npt.NDArray[np.floating[Any]]:
         """
         Scale features of X according to feature_range.
         
         Parameters
         ----------
-        X : np.ndarray
+        X : npt.ArrayLike
             Input 1D data array, shape (n_samples,).
             
         Returns
         -------
-        np.ndarray
+        npt.NDArray[np.floating[Any]]
             Scaled 1D array, shape (n_samples,).
             
         Complexity
@@ -177,18 +188,18 @@ class MinMaxScaler:
         min_val, max_val = self.feature_range
         return X_std * (max_val - min_val) + min_val
 
-    def fit_transform(self, X):
+    def fit_transform(self, X: npt.ArrayLike) -> npt.NDArray[np.floating[Any]]:
         """
         Fit to data, then transform it.
         
         Parameters
         ----------
-        X : np.ndarray
+        X : npt.ArrayLike
             Input 1D data array, shape (n_samples,).
             
         Returns
         -------
-        np.ndarray
+        npt.NDArray[np.floating[Any]]
             Scaled 1D array, shape (n_samples,).
         """
         return self.fit(X).transform(X)
@@ -204,29 +215,39 @@ class Imputer:
         The imputation strategy ('mean', 'median', or 'constant').
     fill_value : float, default=0.0
         The constant value to replace missing values with when strategy='constant'.
-    missing_values : float or np.nan, default=np.nan
+    missing_values : float, default=np.nan
         The placeholder for the missing values received in the input array.
     """
-    def __init__(self, strategy='mean', fill_value=0.0, missing_values=np.nan):
+    strategy: str
+    fill_value: float
+    missing_values: float
+    statistics_: float
+
+    def __init__(
+        self,
+        strategy: str = 'mean',
+        fill_value: float = 0.0,
+        missing_values: float = np.nan,
+    ) -> None:
         if strategy not in ['mean', 'median', 'constant']:
             raise ValueError("Strategy must be 'mean', 'median', or 'constant'")
         self.strategy = strategy
         self.fill_value = fill_value
         self.missing_values = missing_values
 
-    def _get_missing_mask(self, X_arr):
+    def _get_missing_mask(self, X_arr: npt.NDArray[Any]) -> npt.NDArray[np.bool_]:
         """Return a boolean mask indicating where missing_values are located."""
         if np.isnan(self.missing_values):
             return np.isnan(X_arr)
         return X_arr == self.missing_values
 
-    def fit(self, X):
+    def fit(self, X: npt.ArrayLike) -> "Imputer":
         """
         Learn the imputation scalar value from the input 1D array containing missing values.
         
         Parameters
         ----------
-        X : np.ndarray
+        X : npt.ArrayLike
             Input 1D data array containing missing values directly, shape (n_samples,).
             
         Returns
@@ -255,18 +276,18 @@ class Imputer:
             
         return self
 
-    def transform(self, X):
+    def transform(self, X: npt.ArrayLike) -> npt.NDArray[Any]:
         """
         Replace missing values in the input 1D array with the learned statistic.
         
         Parameters
         ----------
-        X : np.ndarray
+        X : npt.ArrayLike
             Input 1D data array containing missing values directly, shape (n_samples,).
             
         Returns
         -------
-        np.ndarray
+        npt.NDArray[Any]
             Imputed 1D array, shape (n_samples,).
             
         Complexity
@@ -281,18 +302,18 @@ class Imputer:
         mask = self._get_missing_mask(X_arr)
         return np.where(mask, self.statistics_, X_arr)
 
-    def fit_transform(self, X):
+    def fit_transform(self, X: npt.ArrayLike) -> npt.NDArray[Any]:
         """
         Fit to data, then transform it.
         
         Parameters
         ----------
-        X : np.ndarray
+        X : npt.ArrayLike
             Input 1D data with missing values, shape (n_samples,).
             
         Returns
         -------
-        np.ndarray
+        npt.NDArray[Any]
             Imputed 1D array, shape (n_samples,).
         """
         return self.fit(X).transform(X)
@@ -303,13 +324,15 @@ class OneHotEncoder:
     Encode a 1D categorical integer feature array into a 2D one-hot matrix.
     Expects input to be non-negative integer categories.
     """
-    def fit(self, X):
+    categories_: int
+
+    def fit(self, X: npt.ArrayLike) -> "OneHotEncoder":
         """
         Determine the maximum number of categories.
         
         Parameters
         ----------
-        X : np.ndarray
+        X : npt.ArrayLike
             Input 1D categorical data array, shape (n_samples,).
             
         Returns
@@ -330,21 +353,21 @@ class OneHotEncoder:
             raise ValueError("Categories must be non-negative integers.")
             
         # Determine number of categories (0-indexed, so we add 1 to the max value)
-        self.categories_ = np.max(X_arr) + 1
+        self.categories_ = int(np.max(X_arr)) + 1
         return self
 
-    def transform(self, X):
+    def transform(self, X: npt.ArrayLike) -> npt.NDArray[np.floating[Any]]:
         """
         Transform the 1D data to a 2D one-hot encoded matrix.
         
         Parameters
         ----------
-        X : np.ndarray
+        X : npt.ArrayLike
             Input 1D categorical data array, shape (n_samples,).
             
         Returns
         -------
-        np.ndarray
+        npt.NDArray[np.floating[Any]]
             One-hot encoded 2D array, shape (n_samples, n_categories).
             
         Raises
@@ -366,18 +389,18 @@ class OneHotEncoder:
         # Instant 1-hot creation via advanced NumPy indexing mapping to an identity matrix
         return np.eye(self.categories_)[X_arr]
 
-    def fit_transform(self, X):
+    def fit_transform(self, X: npt.ArrayLike) -> npt.NDArray[np.floating[Any]]:
         """
         Fit to data, then transform it.
         
         Parameters
         ----------
-        X : np.ndarray
+        X : npt.ArrayLike
             Input 1D categorical data array, shape (n_samples,).
             
         Returns
         -------
-        np.ndarray
+        npt.NDArray[np.floating[Any]]
             One-hot encoded 2D array, shape (n_samples, n_categories).
         """
         return self.fit(X).transform(X)
