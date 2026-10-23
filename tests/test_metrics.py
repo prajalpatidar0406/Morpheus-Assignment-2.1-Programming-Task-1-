@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from metrics import (
+from numcompute.metrics import (
     accuracy,
     auc,
     confusion_matrix,
