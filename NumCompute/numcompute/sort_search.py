@@ -1,19 +1,22 @@
+from typing import Any, Sequence, Tuple, Union
 import numpy as np
+import numpy.typing as npt
 
-def stable_sort(arr, descending=False):
+
+def stable_sort(arr: npt.ArrayLike, descending: bool = False) -> npt.NDArray[Any]:
     """
     Sort a 1D numpy array using stable sorting.
     
     Parameters
     ----------
-    arr : np.ndarray
+    arr : npt.ArrayLike
         1D array to be sorted, shape (n_samples,).
     descending : bool, default=False
         If True, sort in descending order.
         
     Returns
     -------
-    np.ndarray
+    npt.NDArray[Any]
         The sorted 1D array.
         
     Complexity
@@ -21,32 +24,36 @@ def stable_sort(arr, descending=False):
     Time: O(n_samples * log(n_samples))
     Space: O(n_samples)
     """
-    arr = np.asarray(arr)
-    if arr.ndim != 1:
+    arr_np = np.asarray(arr)
+    if arr_np.ndim != 1:
         raise ValueError("stable_sort expects a 1D array.")
         
     # Using stable sort wrapper as per guidelines
-    sort_indices = np.argsort(arr, kind='stable')
+    sort_indices = np.argsort(arr_np, kind='stable')
     
     if descending:
         sort_indices = sort_indices[::-1]
         
-    return arr[sort_indices]
+    return arr_np[sort_indices]
 
-def multi_key_sort(keys, descending=False):
+
+def multi_key_sort(
+    keys: Sequence[npt.ArrayLike],
+    descending: bool = False,
+) -> npt.NDArray[np.intp]:
     """
     Sort based on multiple 1D arrays (multi-key sorting).
     
     Parameters
     ----------
-    keys : tuple or list of np.ndarray
-        Tuple of 1D arrays to sort by, ordered from primary to least significant key.
+    keys : Sequence[npt.ArrayLike]
+        Tuple or list of 1D arrays to sort by, ordered from primary to least significant key.
     descending : bool, default=False
         If True, reverse the final sorted order.
         
     Returns
     -------
-    np.ndarray
+    npt.NDArray[np.intp]
         The 1D array of indices that would sort the arrays.
         
     Complexity
@@ -54,27 +61,34 @@ def multi_key_sort(keys, descending=False):
     Time: O(n_samples * log(n_samples))
     Space: O(n_samples)
     """
-    for k in keys:
-        if np.asarray(k).ndim != 1:
+    # Convert each key to a concrete 1D NDArray in reverse order for np.lexsort
+    key_arrays: Tuple[npt.NDArray[Any], ...] = tuple(np.asarray(k) for k in reversed(keys))
+    for k_arr in key_arrays:
+        if k_arr.ndim != 1:
             raise ValueError("All keys in multi_key_sort must be 1D arrays.")
             
-    # np.lexsort sorts sequentially. It applies sorting from the last array to the first.
-    # We reverse the tuple so the first key provided is the primary sort key.
-    sort_indices = np.lexsort(keys[::-1])
+    # np.lexsort sorts sequentially from the last array to the first.
+    sort_indices = np.lexsort(key_arrays)
     
     if descending:
         sort_indices = sort_indices[::-1]
         
     return sort_indices
 
-def topk(values, k, largest=True, return_indices=True):
+
+def topk(
+    values: npt.ArrayLike,
+    k: int,
+    largest: bool = True,
+    return_indices: bool = True,
+) -> npt.NDArray[Any]:
     """
     Retrieve the top-k elements from a 1D array.
     Uses np.argpartition for an O(n) partial sort.
     
     Parameters
     ----------
-    values : np.ndarray
+    values : npt.ArrayLike
         Input 1D array, shape (n_samples,).
     k : int
         Number of elements to retrieve.
@@ -85,7 +99,7 @@ def topk(values, k, largest=True, return_indices=True):
         
     Returns
     -------
-    np.ndarray
+    npt.NDArray[Any]
         Array of top-k elements or indices, shape (k,). 
         Note: The returned k elements are NOT fully sorted among themselves.
         
@@ -113,7 +127,12 @@ def topk(values, k, largest=True, return_indices=True):
         return idx
     return arr[idx]
 
-def quickselect(values, k, largest=False):
+
+def quickselect(
+    values: npt.ArrayLike,
+    k: int,
+    largest: bool = False,
+) -> Any:
     """
     Finds the k-th smallest (or largest) element in an unordered 1D array.
     Implemented as an educational recursive function using NumPy boolean masks
@@ -121,7 +140,7 @@ def quickselect(values, k, largest=False):
     
     Parameters
     ----------
-    values : np.ndarray
+    values : npt.ArrayLike
         Input 1D array, shape (n_samples,).
     k : int
         The rank of the element to find (1-indexed). e.g., k=1 means the absolute smallest/largest.
@@ -130,8 +149,8 @@ def quickselect(values, k, largest=False):
         
     Returns
     -------
-    scalar
-        The k-th element.
+    Any
+        The k-th element scalar.
         
     Complexity
     ----------
@@ -162,26 +181,30 @@ def quickselect(values, k, largest=False):
     if k <= len(left):
         return quickselect(left, k, largest=False)
     elif k <= len(left) + len(mid):
-        return pivot
+        return pivot.item() if isinstance(pivot, np.generic) else pivot
     else:
         # Subtract the length of the left and middle portions for the recursive call
         return quickselect(right, k - len(left) - len(mid), largest=False)
 
-def binary_search(sorted_array, x):
+
+def binary_search(
+    sorted_array: npt.ArrayLike,
+    x: Union[int, float, npt.ArrayLike],
+) -> Tuple[Union[int, npt.NDArray[np.intp]], Union[bool, npt.NDArray[np.bool_]]]:
     """
     Finds the insertion indices for targets in a sorted 1D array,
     and returns whether the target exactly exists in the array.
     
     Parameters
     ----------
-    sorted_array : np.ndarray
+    sorted_array : npt.ArrayLike
         A 1D array that is ALREADY sorted in ascending order.
-    x : scalar or np.ndarray
+    x : Union[int, float, npt.ArrayLike]
         The value(s) to search for.
         
     Returns
     -------
-    tuple (insertion_indices, exists)
+    Tuple[Union[int, npt.NDArray[np.intp]], Union[bool, npt.NDArray[np.bool_]]]
         insertion_indices: int or np.ndarray. Where the value should be inserted.
         exists: bool or np.ndarray. True if the exact value already exists.
         
