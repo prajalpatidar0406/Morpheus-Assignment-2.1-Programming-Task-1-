@@ -1,178 +1,186 @@
 import numpy as np
 import pytest
-from numcompute.sort_search import (
-    stable_sort,
-    multi_key_sort,
-    topk,
-    quickselect,
-    binary_search,
+from numcompute.preprocessing import (
+    StandardScaler,
+    MinMaxScaler,
+    Imputer,
+    OneHotEncoder,
 )
 
 
 # =====================================================================
-# Sorting Tests: stable_sort & multi_key_sort (Tests 1 - 5)
+# StandardScaler Tests (Tests 1 - 4)
 # =====================================================================
 
-def test_stable_sort_ascending():
-    """1. Test basic sorting in ascending order."""
-    arr = np.array([3, 1, 4, 1, 5, 9, 2])
-    sorted_arr = stable_sort(arr, descending=False)
-    np.testing.assert_array_equal(sorted_arr, np.array([1, 1, 2, 3, 4, 5, 9]))
+def test_standard_scaler_normal():
+    """1. Test standard scaling on a normal 1D array."""
+    X = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    assert np.isclose(np.mean(X_scaled), 0.0)
+    assert np.isclose(np.std(X_scaled), 1.0)
 
 
-def test_stable_sort_descending():
-    """2. Test sorting in descending order."""
-    arr = np.array([3, 1, 4, 1, 5])
-    sorted_arr = stable_sort(arr, descending=True)
-    np.testing.assert_array_equal(sorted_arr, np.array([5, 4, 3, 1, 1]))
+def test_standard_scaler_constant():
+    """2. Test scaling a constant array (zero variance should not divide by zero)."""
+    X = np.array([5.0, 5.0, 5.0, 5.0])
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    assert scaler.scale_ == 1.0
+    np.testing.assert_allclose(X_scaled, np.zeros_like(X))
 
 
-def test_stable_sort_negatives_and_all_equal():
-    """3. Test stable_sort with negative values and an all-equal array."""
-    arr_neg = np.array([-5.0, -1.0, -10.0, 0.0])
-    np.testing.assert_array_equal(stable_sort(arr_neg), np.array([-10.0, -5.0, -1.0, 0.0]))
+def test_standard_scaler_separate_train_test():
+    """3. Test that transform uses training parameters on unseen test data."""
+    X_train = np.array([0.0, 10.0])  # mean = 5.0, std = 5.0
+    X_test = np.array([15.0, 25.0])
 
-    arr_const = np.array([4, 4, 4, 4])
-    np.testing.assert_array_equal(stable_sort(arr_const), arr_const)
+    scaler = StandardScaler(epsilon=0.0)
+    scaler.fit(X_train)
+    X_test_scaled = scaler.transform(X_test)
 
-
-def test_multi_key_sort_ascending():
-    """4. Test sorting by primary key first, then breaking ties with secondary key."""
-    primary = np.array([2, 1, 2, 1])
-    secondary = np.array([20, 30, 10, 15])
-
-    indices = multi_key_sort((primary, secondary), descending=False)
-    # Expected order: (1, 15) at idx 3, (1, 30) at idx 1, (2, 10) at idx 2, (2, 20) at idx 0
-    np.testing.assert_array_equal(indices, np.array([3, 1, 2, 0]))
+    np.testing.assert_allclose(X_test_scaled, np.array([2.0, 4.0]))
 
 
-def test_multi_key_sort_descending():
-    """5. Test multi_key_sort in descending order."""
-    primary = np.array([1, 2, 1])
-    secondary = np.array([10, 5, 20])
-
-    indices = multi_key_sort((primary, secondary), descending=True)
-    np.testing.assert_array_equal(indices, np.array([1, 2, 0]))
+def test_standard_scaler_unfitted_error():
+    """4. Test that calling transform before fit raises a ValueError."""
+    scaler = StandardScaler()
+    with pytest.raises(ValueError, match="not fitted yet"):
+        scaler.transform(np.array([1.0, 2.0, 3.0]))
 
 
 # =====================================================================
-# Top-K Partial Sort Tests (Tests 6 - 9)
+# MinMaxScaler Tests (Tests 5 - 7)
 # =====================================================================
 
-def test_topk_largest_indices_and_values():
-    """6. Test retrieving top-k largest indices and values."""
-    arr = np.array([10, 50, 20, 40, 30])
+def test_minmax_scaler_default_range():
+    """5. Test MinMaxScaler scaling to the default [0, 1] range."""
+    X = np.array([-10.0, 0.0, 10.0, 30.0])
+    scaler = MinMaxScaler()
+    X_scaled = scaler.fit_transform(X)
 
-    idx = topk(arr, k=2, largest=True, return_indices=True)
-    vals = topk(arr, k=2, largest=True, return_indices=False)
-
-    assert len(idx) == 2
-    assert set(idx) == {1, 3}
-    assert set(vals) == {40, 50}
-
-
-def test_topk_smallest_values():
-    """7. Test retrieving top-k smallest elements (largest=False)."""
-    arr = np.array([100, 5, 20, 1, 50])
-    vals = topk(arr, k=3, largest=False, return_indices=False)
-
-    assert len(vals) == 3
-    assert set(vals) == {1, 5, 20}
+    assert np.isclose(np.min(X_scaled), 0.0)
+    assert np.isclose(np.max(X_scaled), 1.0)
+    np.testing.assert_allclose(X_scaled, np.array([0.0, 0.25, 0.5, 1.0]))
 
 
-def test_topk_extreme_k_bounds():
-    """8. Test topk edge cases where k=1 and k=len(arr)."""
-    arr = np.array([8, 2, 15, 4])
+def test_minmax_scaler_custom_range():
+    """6. Test MinMaxScaler scaling to a custom feature_range=(-1, 1)."""
+    X = np.array([0.0, 5.0, 10.0])
+    scaler = MinMaxScaler(feature_range=(-1.0, 1.0))
+    X_scaled = scaler.fit_transform(X)
 
-    top_1 = topk(arr, k=1, largest=True, return_indices=False)
-    np.testing.assert_array_equal(top_1, np.array([15]))
-
-    top_all = topk(arr, k=len(arr), largest=True, return_indices=False)
-    assert set(top_all) == {2, 4, 8, 15}
+    np.testing.assert_allclose(X_scaled, np.array([-1.0, 0.0, 1.0]))
 
 
-def test_topk_invalid_k():
-    """9. Test topk raising ValueError when k < 1 or k > len(arr)."""
-    arr = np.array([1, 2, 3])
-    with pytest.raises(ValueError, match="k must be between"):
-        topk(arr, k=0)
-    with pytest.raises(ValueError, match="k must be between"):
-        topk(arr, k=4)
+def test_minmax_scaler_constant():
+    """7. Test MinMaxScaler on a constant array (range = 0 should not crash)."""
+    X = np.array([7.0, 7.0, 7.0])
+    scaler = MinMaxScaler(feature_range=(2.0, 5.0))
+    X_scaled = scaler.fit_transform(X)
+
+    assert scaler.data_range_ == 1.0
+    np.testing.assert_allclose(X_scaled, np.array([2.0, 2.0, 2.0]))
 
 
 # =====================================================================
-# Quickselect Tests (Tests 10 - 12)
+# Imputer Tests (Tests 8 - 12)
 # =====================================================================
 
-def test_quickselect_kth_smallest():
-    """10. Test quickselect for minimum (k=1), median (k=3), and maximum (k=5)."""
-    arr = np.array([7, 10, 4, 3, 20])
-    assert quickselect(arr, k=1, largest=False) == 3
-    assert quickselect(arr, k=3, largest=False) == 7
-    assert quickselect(arr, k=5, largest=False) == 20
+def test_imputer_mean_nan():
+    """8. Test Imputer replacing np.nan with the mean of valid elements."""
+    X = np.array([1.0, np.nan, 3.0, np.nan, 5.0])
+    imputer = Imputer(strategy='mean')
+    X_imputed = imputer.fit_transform(X)
+
+    np.testing.assert_allclose(X_imputed, np.array([1.0, 3.0, 3.0, 3.0, 5.0]))
 
 
-def test_quickselect_kth_largest_with_duplicates():
-    """11. Test quickselect finding k-th largest in an array with duplicate ties."""
-    arr = np.array([5, 1, 5, 3, 5, 2])
-    # Sorted descending: [5, 5, 5, 3, 2, 1]
-    assert quickselect(arr, k=2, largest=True) == 5
-    assert quickselect(arr, k=4, largest=True) == 3
-    assert quickselect(arr, k=6, largest=True) == 1
+def test_imputer_median_nan():
+    """9. Test Imputer replacing np.nan with the median (robust to outliers)."""
+    X = np.array([1.0, 2.0, 100.0, np.nan])
+    imputer = Imputer(strategy='median')
+    X_imputed = imputer.fit_transform(X)
+
+    # Median of [1.0, 2.0, 100.0] is 2.0
+    np.testing.assert_allclose(X_imputed, np.array([1.0, 2.0, 100.0, 2.0]))
 
 
-def test_quickselect_invalid_k():
-    """12. Test quickselect raising ValueError for out-of-bounds k."""
-    arr = np.array([10, 20, 30])
-    with pytest.raises(ValueError, match="k must be between"):
-        quickselect(arr, k=0)
-    with pytest.raises(ValueError, match="k must be between"):
-        quickselect(arr, k=5)
+def test_imputer_custom_missing_values_placeholder():
+    """10. Test Imputer when missing values are passed as a custom placeholder (-999.0)."""
+    X = np.array([10.0, -999.0, 20.0, -999.0])
+    imputer = Imputer(strategy='mean', missing_values=-999.0)
+    X_imputed = imputer.fit_transform(X)
+
+    np.testing.assert_allclose(X_imputed, np.array([10.0, 15.0, 20.0, 15.0]))
+
+
+def test_imputer_constant_and_all_missing_fallback():
+    """11. Test Imputer constant strategy and fallback when all values are missing."""
+    X_all_nan = np.array([np.nan, np.nan, np.nan])
+    imputer = Imputer(strategy='mean', fill_value=-1.0)
+    X_imputed = imputer.fit_transform(X_all_nan)
+
+    np.testing.assert_allclose(X_imputed, np.array([-1.0, -1.0, -1.0]))
+
+
+def test_imputer_invalid_strategy():
+    """12. Test Imputer raising ValueError when initialized with an unknown strategy."""
+    with pytest.raises(ValueError, match="Strategy must be"):
+        Imputer(strategy='most_frequent')
 
 
 # =====================================================================
-# Binary Search & General Edge Case Tests (Tests 13 - 15)
+# OneHotEncoder & General Edge Case Tests (Tests 13 - 15)
 # =====================================================================
 
-def test_binary_search_scalar():
-    """13. Test binary_search with scalar targets (both existing and missing)."""
-    sorted_arr = np.array([10, 20, 30, 40, 50])
+def test_onehot_encoder_normal():
+    """13. Test OneHotEncoder converting 1D integer categories into a 2D binary matrix."""
+    X = np.array([0, 2, 1, 0])
+    encoder = OneHotEncoder()
+    X_encoded = encoder.fit_transform(X)
 
-    idx_found, exists_found = binary_search(sorted_arr, 30)
-    assert idx_found == 2
-    assert exists_found is True
-
-    idx_missing, exists_missing = binary_search(sorted_arr, 25)
-    assert idx_missing == 2
-    assert exists_missing is False
-
-
-def test_binary_search_vector_and_out_of_bounds():
-    """14. Test vectorized binary_search including targets smaller than min and larger than max."""
-    sorted_arr = np.array([10, 20, 30])
-    targets = np.array([5, 10, 25, 30, 100])
-
-    indices, exists = binary_search(sorted_arr, targets)
-    np.testing.assert_array_equal(indices, np.array([0, 0, 2, 2, 3]))
-    np.testing.assert_array_equal(exists, np.array([False, True, False, True, False]))
+    expected = np.array([
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0],
+    ])
+    assert X_encoded.shape == (4, 3)
+    np.testing.assert_array_equal(X_encoded, expected)
 
 
-def test_sort_search_non_contiguous_and_invalid_dimensions():
-    """15. Test non-contiguous 1D slices and ensure 2D arrays raise ValueError."""
-    base = np.array([50, 0, 10, 0, 30, 0, 20, 0, 40])
-    strided = base[::2]  # [50, 10, 30, 20, 40]
-    assert not strided.flags['C_CONTIGUOUS']
+def test_onehot_encoder_invalid_inputs():
+    """14. Test OneHotEncoder rejecting floats, negative categories, and unseen categories."""
+    encoder = OneHotEncoder()
 
-    np.testing.assert_array_equal(stable_sort(strided), np.array([10, 20, 30, 40, 50]))
-    assert quickselect(strided, k=3) == 30
+    # Rejects floats
+    with pytest.raises(ValueError, match="integer categorical data"):
+        encoder.fit(np.array([0.0, 1.5, 2.0]))
 
-    # 2D inputs must raise ValueError across functions
-    arr_2d = np.array([[1, 2], [3, 4]])
-    with pytest.raises(ValueError):
-        stable_sort(arr_2d)
-    with pytest.raises(ValueError):
-        topk(arr_2d, k=1)
-    with pytest.raises(ValueError):
-        quickselect(arr_2d, k=1)
-    with pytest.raises(ValueError):
-        binary_search(arr_2d, 2)
+    # Rejects negative integers
+    with pytest.raises(ValueError, match="non-negative integers"):
+        encoder.fit(np.array([-1, 0, 1]))
+
+    # Rejects unseen categories during transform
+    encoder.fit(np.array([0, 1]))
+    with pytest.raises(ValueError, match="unknown categories"):
+        encoder.transform(np.array([0, 1, 2]))
+
+
+def test_preprocessing_non_contiguous_and_invalid_dimensions():
+    """15. Test non-contiguous 1D array strides and rejection of 2D arrays."""
+    # Non-contiguous slice (step=2)
+    base = np.array([10.0, 99.0, 20.0, 99.0, 30.0, 99.0])
+    X_strided = base[::2]  # [10.0, 20.0, 30.0]
+    assert not X_strided.flags['C_CONTIGUOUS']
+
+    scaler = MinMaxScaler()
+    np.testing.assert_allclose(scaler.fit_transform(X_strided), np.array([0.0, 0.5, 1.0]))
+
+    # 2D array must raise ValueError
+    X_2d = np.array([[1.0, 2.0], [3.0, 4.0]])
+    with pytest.raises(ValueError, match="X must be a 1D array"):
+        scaler.fit(X_2d)
