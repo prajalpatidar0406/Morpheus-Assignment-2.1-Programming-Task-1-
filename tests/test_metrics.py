@@ -1,5 +1,3 @@
-"""Behavior and edge-case tests for classification and regression metrics."""
-
 import numpy as np
 import pytest
 
@@ -15,7 +13,7 @@ from numcompute.metrics import (
     roc_curve,
 )
 
-# Shared example: TP=3, FP=1, FN=2, TN=4 when 1 is the positive label.
+# Example: TP=3, FP=1, FN=2, TN=4 when 1 is the positive label.
 Y_TRUE = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
 Y_PRED = [1, 1, 1, 0, 0, 1, 0, 0, 0, 0]
 
@@ -41,7 +39,7 @@ def test_f1_of_a_mixed_prediction() -> None:
 def test_confusion_matrix_for_binary_labels() -> None:
     result = confusion_matrix(Y_TRUE, Y_PRED)
 
-    # Rows are actual labels; columns are predicted labels.
+    # Rows are actual labels and columns are predicted labels.
     np.testing.assert_array_equal(result, [[4, 1], [2, 3]])
 
 
@@ -84,7 +82,7 @@ def test_metrics_reject_empty_or_mismatched_inputs(
 def test_zero_division_fallback_when_there_are_no_positives(
     func, zero_division: int, expected: float
 ) -> None:
-    # No positive labels appear anywhere, so the ratio is 0 / 0.
+    # No positive labels appear anywhere so the ratio is 0/0.
     assert func([0, 0], [0, 0], zero_division=zero_division) == expected
 
 
@@ -145,7 +143,8 @@ def test_roc_curve_rejects_invalid_inputs(
     [
         ([0, 1], [0, 1], 0.5),
         ([0, 0.5, 1], [0, 1, 1], 0.75),
-        # Decreasing x gives the same non-negative area.
+        
+        # Decreasing x gives the same non negative area.
         ([1, 0.5, 0], [1, 1, 0], 0.75),
     ],
 )

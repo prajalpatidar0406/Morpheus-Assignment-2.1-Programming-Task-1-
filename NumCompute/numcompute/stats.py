@@ -182,7 +182,7 @@ def std(
     arr = _validate_data(data)
 
     if not isinstance(ddof, (int, np.integer)) or ddof < 0:
-        raise ValueError("ddof must be a non negative integer")
+        raise ValueError("ddof must be a non-negative integer")
 
     if skipna:
         return np.nanstd(arr, axis=axis, ddof=ddof)
