@@ -33,6 +33,7 @@ def _convert_rows(
     missing = (raw == "") | (np.char.lower(raw) == "nan")
 
     if missing_strategy == "drop":
+        # Drop a whole record if any column is missing, so rows stay aligned.
         raw = raw[~missing.any(axis=1)]
     else:
         raw = raw.astype(object)
@@ -42,8 +43,12 @@ def _convert_rows(
         try:
             return raw.astype(dtype)
         except (TypeError, ValueError) as error:
-            raise ValueError(f"CSV values cannot be converted to dtype {dtype}.") from error
+            raise ValueError(
+                f"CSV values cannot be converted to dtype {dtype}."
+            ) from error
 
+    # Infer each column separately: numeric columns become floats, while names
+    # and other labels stay as strings.
     columns = []
     for column in raw.T:
         try:
@@ -95,6 +100,7 @@ def iter_csv(
             data = _convert_rows(raw, missing_strategy, fill_value, dtype)
             if data.shape[0]:
                 yield header, data
+            # A short read means we reached the end of the file.
             if raw.shape[0] < chunksize:
                 break
 
@@ -120,6 +126,7 @@ def load_csv(
     )
     if chunks:
         header = chunks[0][0]
+        # Combine the chunks only for load_csv; iter_csv can stay memory-friendly.
         data = np.concatenate([chunk for _, chunk in chunks], axis=0)
         return header, data
 
