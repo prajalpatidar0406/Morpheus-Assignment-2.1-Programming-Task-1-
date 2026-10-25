@@ -40,7 +40,11 @@ def cosine_similarity(a: npt.ArrayLike, b: npt.ArrayLike) -> float:
     if left.shape != right.shape:
         raise ValueError("a and b must have the same shape.")
     denominator = np.linalg.norm(left) * np.linalg.norm(right)
-    return 0.0 if denominator == 0 else float(np.dot(left.ravel(), right.ravel()) / denominator)
+    return (
+        0.0
+        if denominator == 0
+        else float(np.dot(left.ravel(), right.ravel()) / denominator)
+    )
 
 
 def relu(x: npt.ArrayLike) -> npt.NDArray[np.float64]:
@@ -53,6 +57,7 @@ def sigmoid(x: npt.ArrayLike) -> npt.NDArray[np.float64]:
     values = np.asarray(x, dtype=float)
     result = np.empty_like(values)
     positive = values >= 0
+    # Use a different equivalent formula for negative inputs to avoid overflow.
     result[positive] = 1 / (1 + np.exp(-values[positive]))
     exp_values = np.exp(values[~positive])
     result[~positive] = exp_values / (1 + exp_values)
@@ -72,6 +77,8 @@ def softmax(x: npt.ArrayLike, axis: int = -1) -> npt.NDArray[np.float64]:
     positive_infinity = np.isposinf(values)
     positive_count = positive_infinity.sum(axis=axis, keepdims=True)
     negative_infinity_only = np.isneginf(maximum)
+    # Subtracting the largest value keeps exponentials small without changing
+    # the final probabilities; infinite inputs need their own handling below.
     shifted = np.where(
         positive_infinity,
         0.0,
@@ -92,12 +99,16 @@ def softmax(x: npt.ArrayLike, axis: int = -1) -> npt.NDArray[np.float64]:
         where=positive_count > 0,
     )
     uniform = np.full_like(values, 1.0 / values.shape[axis])
+    # Split probability evenly across +inf entries (or the whole row if all
+    # entries are -inf), instead of producing undefined inf/inf results.
     probabilities = np.where(positive_count > 0, inf_probabilities, probabilities)
     probabilities = np.where(negative_infinity_only, uniform, probabilities)
     return np.where(np.isnan(maximum), np.nan, probabilities)
 
 
-def logsumexp(x: npt.ArrayLike, axis: int | None = None, keepdims: bool = False) -> npt.NDArray[np.float64] | np.float64:
+def logsumexp(
+    x: npt.ArrayLike, axis: int | None = None, keepdims: bool = False
+) -> npt.NDArray[np.float64] | np.float64:
     """Compute log(sum(exp(x))) stably along the selected axis.
 
     Positive- and negative-infinite input maxima return their corresponding
@@ -107,6 +118,7 @@ def logsumexp(x: npt.ArrayLike, axis: int | None = None, keepdims: bool = False)
     if values.size == 0:
         raise ValueError("x must not be empty.")
     maximum = np.max(values, axis=axis, keepdims=True)
+    # Shift finite inputs before exponentiation so large values do not overflow.
     finite_shift = np.where(np.isfinite(maximum), maximum, 0.0)
     shifted = np.where(np.isfinite(maximum), values - finite_shift, -np.inf)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -115,6 +127,7 @@ def logsumexp(x: npt.ArrayLike, axis: int | None = None, keepdims: bool = False)
         )
     result = np.where(np.isposinf(maximum), np.inf, finite_result)
     result = np.where(np.isneginf(maximum), -np.inf, result)
+    result = np.where(np.isnan(maximum), np.nan, result)
     if not keepdims and axis is not None:
         result = np.squeeze(result, axis=axis)
     elif not keepdims and axis is None:
@@ -122,7 +135,9 @@ def logsumexp(x: npt.ArrayLike, axis: int | None = None, keepdims: bool = False)
     return result
 
 
-def topk_indices(values: npt.ArrayLike, k: int, largest: bool = True) -> npt.NDArray[np.intp]:
+def topk_indices(
+    values: npt.ArrayLike, k: int, largest: bool = True
+) -> npt.NDArray[np.intp]:
     """Return ordered indices of k largest/smallest values in a 1D array.
 
     Requires ``1 <= k <= len(values)``. Expected selection work is O(n), plus
@@ -131,10 +146,21 @@ def topk_indices(values: npt.ArrayLike, k: int, largest: bool = True) -> npt.NDA
     array = np.asarray(values)
     if array.ndim != 1:
         raise ValueError("values must be one-dimensional.")
-    if not isinstance(k, (int, np.integer)) or k < 1 or k > array.size:
+    if (
+        not isinstance(k, (int, np.integer))
+        or isinstance(k, (bool, np.bool_))
+        or k < 1
+        or k > array.size
+    ):
         raise ValueError("k must be between 1 and the number of values.")
+    # argpartition selects the boundary efficiently; sort just those k results
+    # so callers receive the requested values in ranked order.
     split = array.size - k if largest else k - 1
-    candidates = np.argpartition(array, split)[-k:] if largest else np.argpartition(array, split)[:k]
+    candidates = (
+        np.argpartition(array, split)[-k:]
+        if largest
+        else np.argpartition(array, split)[:k]
+    )
     order = np.argsort(array[candidates], kind="stable")
     if largest:
         order = order[::-1]
@@ -153,5 +179,6 @@ def batches(data: npt.ArrayLike, batch_size: int) -> Iterator[npt.NDArray[np.gen
         raise ValueError("data must have at least one dimension.")
     if not isinstance(batch_size, (int, np.integer)) or batch_size <= 0:
         raise ValueError("batch_size must be a positive integer.")
+    # Slicing returns views and naturally includes a shorter final batch.
     for start in range(0, len(values), batch_size):
         yield values[start : start + batch_size]
