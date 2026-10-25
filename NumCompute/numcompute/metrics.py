@@ -53,8 +53,8 @@ def _validate_labels(
 
 
 def _safe_divide(
-    numerator: int | float,
-    denominator: int | float,
+    numerator: int | float | np.integer | np.floating,
+    denominator: int | float | np.integer | np.floating,
     zero_division: int = 0,
 ) -> float:
     """
