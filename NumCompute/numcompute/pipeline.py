@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable
 from copy import deepcopy
-from typing import Any, Protocol, cast
+from typing import Protocol, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -19,7 +19,7 @@ def _require_transformer(transformer: object, message: str) -> "Transformer":
 class Transformer(Protocol):
     """Protocol for objects that can fit and transform feature arrays."""
 
-    def fit(self, X: npt.ArrayLike) -> Any: ...
+    def fit(self, X: npt.ArrayLike) -> object: ...
 
     def transform(self, X: npt.ArrayLike) -> npt.ArrayLike: ...
 
@@ -27,7 +27,7 @@ class Transformer(Protocol):
 class Estimator(Protocol):
     """Protocol for final pipeline estimators."""
 
-    def fit(self, X: npt.ArrayLike, y: npt.ArrayLike) -> Any: ...
+    def fit(self, X: npt.ArrayLike, y: npt.ArrayLike) -> object: ...
 
     def predict(self, X: npt.ArrayLike) -> npt.ArrayLike: ...
 
