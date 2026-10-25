@@ -36,9 +36,7 @@ def test_grad_uses_central_difference_by_default() -> None:
         (2.0, 4.0 + 1e-5),
     ],
 )
-def test_grad_forward_difference_for_scalar_inputs(
-    x: float, expected: float
-) -> None:
+def test_grad_forward_difference_for_scalar_inputs(x: float, expected: float) -> None:
     # Forward differences have a small step-sized bias for a squared function.
     derivative = grad(lambda value: value**2, x, method="forward")
 
@@ -64,6 +62,19 @@ def test_grad_accepts_a_list_as_an_array_input() -> None:
     derivative = grad(lambda values: float(np.sum(values**2)), [1.0, -2.0])
 
     np.testing.assert_allclose(derivative, [2.0, -4.0], atol=1e-8)
+
+
+def test_forward_gradient_evaluates_baseline_once() -> None:
+    calls = 0
+
+    def objective(values):
+        nonlocal calls
+        calls += 1
+        return float(np.sum(values**2))
+
+    grad(objective, [1.0, 2.0, 3.0], method="forward")
+
+    assert calls == 4
 
 
 @pytest.mark.parametrize(

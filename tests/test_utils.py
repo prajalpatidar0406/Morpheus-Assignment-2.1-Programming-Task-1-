@@ -1,3 +1,5 @@
+"""Check numeric helpers for distances, activations, selection, and batching."""
+
 import numpy as np
 import pytest
 
@@ -22,6 +24,10 @@ def test_distances():
 def test_distance_rejects_different_shapes():
     with pytest.raises(ValueError, match="same shape"):
         euclidean_distance([1], [1, 2])
+    with pytest.raises(ValueError, match="same shape"):
+        manhattan_distance([1], [1, 2])
+    with pytest.raises(ValueError, match="same shape"):
+        cosine_similarity([1], [1, 2])
 
 
 def test_cosine_similarity_handles_zero_vector():
@@ -40,8 +46,19 @@ def test_softmax_normalizes_per_row():
     np.testing.assert_allclose(result.sum(axis=1), [1.0, 1.0])
 
 
+def test_softmax_and_logsumexp_reject_empty_inputs():
+    with pytest.raises(ValueError, match="must not be empty"):
+        softmax([])
+    with pytest.raises(ValueError, match="must not be empty"):
+        logsumexp([])
+
+
 def test_logsumexp_matches_stable_expected_value():
     assert np.isclose(logsumexp([1000.0, 1000.0]), 1000.0 + np.log(2.0))
+
+
+def test_logsumexp_propagates_nan():
+    assert np.isnan(logsumexp([1.0, np.nan]))
 
 
 def test_logsumexp_and_softmax_handle_infinite_values():
@@ -55,6 +72,17 @@ def test_topk_indices_returns_largest_sorted_first():
     indices = topk_indices([2, 8, 3, 7], 2)
     np.testing.assert_array_equal(indices, [1, 3])
 
+    with pytest.raises(ValueError, match="k must be between"):
+        topk_indices([1, 2], True)
+
+
+def test_topk_indices_returns_smallest_sorted_first_and_validates_shape():
+    indices = topk_indices([8, 2, 7, 1], 2, largest=False)
+    np.testing.assert_array_equal(indices, [3, 1])
+
+    with pytest.raises(ValueError, match="one-dimensional"):
+        topk_indices([[1, 2]], 1)
+
 
 def test_batches_include_final_partial_batch():
     result = list(batches(np.arange(5), 2))
@@ -64,3 +92,5 @@ def test_batches_include_final_partial_batch():
 def test_batches_reject_nonpositive_size():
     with pytest.raises(ValueError, match="positive integer"):
         list(batches([1, 2], 0))
+    with pytest.raises(ValueError, match="at least one dimension"):
+        list(batches(1, 1))
