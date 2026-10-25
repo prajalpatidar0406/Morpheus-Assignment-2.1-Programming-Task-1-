@@ -1,3 +1,5 @@
+"""Check sorting, partial selection, quickselect, and binary search."""
+
 import numpy as np
 import pytest
 from numcompute.sort_search import (
@@ -9,45 +11,61 @@ from numcompute.sort_search import (
 )
 
 
-# =====================================================================
-# Sorting Tests: stable_sort & multi_key_sort (Tests 1 - 5)
-# =====================================================================
+# Sorting
+
 
 def test_stable_sort_ascending():
-    """1. Test basic sorting in ascending order."""
+    """Sort values from smallest to largest."""
     arr = np.array([3, 1, 4, 1, 5, 9, 2])
     sorted_arr = stable_sort(arr, descending=False)
     np.testing.assert_array_equal(sorted_arr, np.array([1, 1, 2, 3, 4, 5, 9]))
 
 
 def test_stable_sort_descending():
-    """2. Test sorting in descending order."""
+    """Sort largest-first while retaining the order of equal items."""
     arr = np.array([3, 1, 4, 1, 5])
     sorted_arr = stable_sort(arr, descending=True)
     np.testing.assert_array_equal(sorted_arr, np.array([5, 4, 3, 1, 1]))
 
+    class Item:
+        def __init__(self, key, name):
+            self.key = key
+            self.name = name
+
+        def __lt__(self, other):
+            return self.key < other.key
+
+        def __eq__(self, other):
+            return self.key == other.key
+
+    items = np.array([Item(2, "first"), Item(1, "middle"), Item(2, "last")])
+    result = stable_sort(items, descending=True)
+    assert [item.name for item in result] == ["first", "last", "middle"]
+
 
 def test_stable_sort_negatives_and_all_equal():
-    """3. Test stable_sort with negative values and an all-equal array."""
+    """Handle negative values and arrays where every value is tied."""
     arr_neg = np.array([-5.0, -1.0, -10.0, 0.0])
-    np.testing.assert_array_equal(stable_sort(arr_neg), np.array([-10.0, -5.0, -1.0, 0.0]))
+    np.testing.assert_array_equal(
+        stable_sort(arr_neg), np.array([-10.0, -5.0, -1.0, 0.0])
+    )
 
     arr_const = np.array([4, 4, 4, 4])
     np.testing.assert_array_equal(stable_sort(arr_const), arr_const)
 
 
 def test_multi_key_sort_ascending():
-    """4. Test sorting by primary key first, then breaking ties with secondary key."""
+    """Use the first key as primary and the next key to break ties."""
     primary = np.array([2, 1, 2, 1])
     secondary = np.array([20, 30, 10, 15])
 
     indices = multi_key_sort((primary, secondary), descending=False)
-    # Expected order: (1, 15) at idx 3, (1, 30) at idx 1, (2, 10) at idx 2, (2, 20) at idx 0
+    # The result refers to original row positions, not sorted value pairs.
     np.testing.assert_array_equal(indices, np.array([3, 1, 2, 0]))
 
 
 def test_multi_key_sort_descending():
-    """5. Test multi_key_sort in descending order."""
+    """Sort multiple keys in descending order."""
     primary = np.array([1, 2, 1])
     secondary = np.array([10, 5, 20])
 
@@ -55,12 +73,32 @@ def test_multi_key_sort_descending():
     np.testing.assert_array_equal(indices, np.array([1, 2, 0]))
 
 
-# =====================================================================
-# Top-K Partial Sort Tests (Tests 6 - 9)
-# =====================================================================
+def test_multi_key_sort_validates_keys():
+    with pytest.raises(ValueError, match="at least one"):
+        multi_key_sort([])
+    with pytest.raises(ValueError, match="same length"):
+        multi_key_sort(([1, 2], [1]))
+    with pytest.raises(ValueError, match="1D arrays"):
+        multi_key_sort(([1, 2], [[1, 2]]))
+
+
+def test_stable_sort_handles_empty_descending_input():
+    np.testing.assert_array_equal(stable_sort([], descending=True), [])
+
+
+def test_stable_sort_descending_preserves_nan_tie_order():
+    values = np.array([2.0, np.nan, 1.0, np.nan])
+
+    result = stable_sort(values, descending=True)
+
+    np.testing.assert_array_equal(result, [np.nan, np.nan, 2.0, 1.0])
+
+
+# Top-k selection
+
 
 def test_topk_largest_indices_and_values():
-    """6. Test retrieving top-k largest indices and values."""
+    """Return both the selected indices and their corresponding values."""
     arr = np.array([10, 50, 20, 40, 30])
 
     idx = topk(arr, k=2, largest=True, return_indices=True)
@@ -72,7 +110,7 @@ def test_topk_largest_indices_and_values():
 
 
 def test_topk_smallest_values():
-    """7. Test retrieving top-k smallest elements (largest=False)."""
+    """Select the smallest values when largest is disabled."""
     arr = np.array([100, 5, 20, 1, 50])
     vals = topk(arr, k=3, largest=False, return_indices=False)
 
@@ -81,7 +119,7 @@ def test_topk_smallest_values():
 
 
 def test_topk_extreme_k_bounds():
-    """8. Test topk edge cases where k=1 and k=len(arr)."""
+    """Support selecting one item or every item in the array."""
     arr = np.array([8, 2, 15, 4])
 
     top_1 = topk(arr, k=1, largest=True, return_indices=False)
@@ -92,20 +130,23 @@ def test_topk_extreme_k_bounds():
 
 
 def test_topk_invalid_k():
-    """9. Test topk raising ValueError when k < 1 or k > len(arr)."""
+    """Reject counts outside the range of available values."""
     arr = np.array([1, 2, 3])
     with pytest.raises(ValueError, match="k must be between"):
         topk(arr, k=0)
     with pytest.raises(ValueError, match="k must be between"):
         topk(arr, k=4)
+    with pytest.raises(ValueError, match="integer"):
+        topk(arr, k=1.5)
+    with pytest.raises(ValueError, match="integer"):
+        topk(arr, k=True)
 
 
-# =====================================================================
-# Quickselect Tests (Tests 10 - 12)
-# =====================================================================
+# Quickselect
+
 
 def test_quickselect_kth_smallest():
-    """10. Test quickselect for minimum (k=1), median (k=3), and maximum (k=5)."""
+    """Find the minimum, a middle-ranked value, and the maximum."""
     arr = np.array([7, 10, 4, 3, 20])
     assert quickselect(arr, k=1, largest=False) == 3
     assert quickselect(arr, k=3, largest=False) == 7
@@ -113,29 +154,32 @@ def test_quickselect_kth_smallest():
 
 
 def test_quickselect_kth_largest_with_duplicates():
-    """11. Test quickselect finding k-th largest in an array with duplicate ties."""
+    """Count duplicate values separately when finding a ranked item."""
     arr = np.array([5, 1, 5, 3, 5, 2])
-    # Sorted descending: [5, 5, 5, 3, 2, 1]
+    # The three copies of 5 occupy the first three positions in descending order.
     assert quickselect(arr, k=2, largest=True) == 5
     assert quickselect(arr, k=4, largest=True) == 3
     assert quickselect(arr, k=6, largest=True) == 1
 
 
 def test_quickselect_invalid_k():
-    """12. Test quickselect raising ValueError for out-of-bounds k."""
+    """Reject invalid ranks, missing numbers, and non-numeric input."""
     arr = np.array([10, 20, 30])
     with pytest.raises(ValueError, match="k must be between"):
         quickselect(arr, k=0)
     with pytest.raises(ValueError, match="k must be between"):
         quickselect(arr, k=5)
+    with pytest.raises(ValueError, match="NaN"):
+        quickselect([1.0, np.nan], k=1)
+    with pytest.raises(TypeError, match="real numeric"):
+        quickselect(["a", "b"], k=1)
 
 
-# =====================================================================
-# Binary Search & General Edge Case Tests (Tests 13 - 15)
-# =====================================================================
+# Binary search and input edge cases
+
 
 def test_binary_search_scalar():
-    """13. Test binary_search with scalar targets (both existing and missing)."""
+    """Return an insertion position and whether a scalar target exists."""
     sorted_arr = np.array([10, 20, 30, 40, 50])
 
     idx_found, exists_found = binary_search(sorted_arr, 30)
@@ -148,7 +192,7 @@ def test_binary_search_scalar():
 
 
 def test_binary_search_vector_and_out_of_bounds():
-    """14. Test vectorized binary_search including targets smaller than min and larger than max."""
+    """Search several values, including targets outside the array's range."""
     sorted_arr = np.array([10, 20, 30])
     targets = np.array([5, 10, 25, 30, 100])
 
@@ -158,15 +202,15 @@ def test_binary_search_vector_and_out_of_bounds():
 
 
 def test_sort_search_non_contiguous_and_invalid_dimensions():
-    """15. Test non-contiguous 1D slices and ensure 2D arrays raise ValueError."""
+    """Accept strided one-dimensional arrays and reject multidimensional input."""
     base = np.array([50, 0, 10, 0, 30, 0, 20, 0, 40])
-    strided = base[::2]  # [50, 10, 30, 20, 40]
-    assert not strided.flags['C_CONTIGUOUS']
+    strided = base[::2]  # A non-contiguous view containing [50, 10, 30, 20, 40].
+    assert not strided.flags["C_CONTIGUOUS"]
 
     np.testing.assert_array_equal(stable_sort(strided), np.array([10, 20, 30, 40, 50]))
     assert quickselect(strided, k=3) == 30
 
-    # 2D inputs must raise ValueError across functions
+    # All operations in this module expect a single sorted or sortable sequence.
     arr_2d = np.array([[1, 2], [3, 4]])
     with pytest.raises(ValueError):
         stable_sort(arr_2d)
