@@ -12,7 +12,7 @@ def grad(
     method: str = "central",
 ) -> float | NDArray[np.float64]:
     """
-    Estimate the gradient of a scalar-valued function.
+    Estimate how quickly a scalar-valued function changes near a point.
 
     Parameters
     ----------
@@ -21,7 +21,7 @@ def grad(
     x : scalar or array-like
         Point at which the gradient is evaluated.
     h : float, default=1e-5
-        Finite-difference step size.
+        Small change in the input used to estimate the derivative.
     method : {"central", "forward"}, default="central"
         Finite-difference method.
 
@@ -53,8 +53,11 @@ def grad(
         return (f(x0 + h) - f(x0)) / h
 
     gradient: NDArray[np.float64] = np.zeros_like(x_array, dtype=float)
+    # Forward differences reuse this value instead of reevaluating f(x).
+    baseline = f(x_array.copy()) if method == "forward" else None
 
     for index in np.ndindex(x_array.shape):
+        # Change one coordinate at a time to estimate that input's derivative.
         x_plus: NDArray[np.float64] = x_array.copy()
         x_minus: NDArray[np.float64] = x_array.copy()
 
@@ -64,7 +67,7 @@ def grad(
         if method == "central":
             gradient[index] = (f(x_plus) - f(x_minus)) / (2 * h)
         else:
-            gradient[index] = (f(x_plus) - f(x_array)) / h
+            gradient[index] = (f(x_plus) - baseline) / h
 
     return gradient
 
@@ -76,7 +79,7 @@ def jacobian(
     method: str = "central",
 ) -> NDArray[np.float64]:
     """
-    Estimate the Jacobian matrix of a vector-valued function.
+    Estimate how each output of a function changes as each input changes.
 
     Parameters
     ----------
@@ -85,7 +88,7 @@ def jacobian(
     x : array-like
         Point at which the Jacobian is evaluated.
     h : float, default=1e-5
-        Finite-difference step size.
+        Small change in the input used to estimate each derivative.
     method : {"central", "forward"}, default="central"
         Finite-difference method.
 
@@ -114,6 +117,7 @@ def jacobian(
         x_array = x_array.reshape(1)
 
     output: NDArray[np.float64] = np.asarray(F(x_array), dtype=float).reshape(-1)
+    # Each column of the Jacobian describes one input; each row describes one output.
     jac: NDArray[np.float64] = np.zeros((output.size, x_array.size), dtype=float)
 
     for i, index in enumerate(np.ndindex(x_array.shape)):
@@ -124,17 +128,13 @@ def jacobian(
         x_minus[index] -= h
 
         if method == "central":
-            f_plus: NDArray[np.float64] = np.asarray(
-                F(x_plus), dtype=float
-            ).reshape(-1)
-            f_minus: NDArray[np.float64] = np.asarray(
-                F(x_minus), dtype=float
-            ).reshape(-1)
+            f_plus: NDArray[np.float64] = np.asarray(F(x_plus), dtype=float).reshape(-1)
+            f_minus: NDArray[np.float64] = np.asarray(F(x_minus), dtype=float).reshape(
+                -1
+            )
             jac[:, i] = (f_plus - f_minus) / (2 * h)
         else:
-            f_plus: NDArray[np.float64] = np.asarray(
-                F(x_plus), dtype=float
-            ).reshape(-1)
+            f_plus: NDArray[np.float64] = np.asarray(F(x_plus), dtype=float).reshape(-1)
             jac[:, i] = (f_plus - output) / h
 
     return jac
