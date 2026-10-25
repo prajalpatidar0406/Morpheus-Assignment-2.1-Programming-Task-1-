@@ -1,20 +1,14 @@
+"""Check ranking and percentile behavior, including mixed and invalid values."""
+
 import numpy as np
 import pytest
 from numcompute.rank import Ranker
 
 
-# ---------------------------------------------------------
-# FIXTURE
-# ---------------------------------------------------------
-
 @pytest.fixture
 def ranker():
     return Ranker()
 
-
-# ---------------------------------------------------------
-# VALID INPUT TESTS — RANK
-# ---------------------------------------------------------
 
 def test_rank_average_basic(ranker):
     data = [10, 20, 20, 30]
@@ -37,15 +31,16 @@ def test_rank_ordinal_basic(ranker):
     assert np.allclose(result, expected)
 
 
-# ---------------------------------------------------------
-# MIXED DATA TESTS — RANK
-# ---------------------------------------------------------
+def test_rank_ordinal_preserves_order_of_ties(ranker):
+    result = ranker.rank([2, 1, 2, 1], method="ordinal")
+    np.testing.assert_array_equal(result, [3, 1, 4, 2])
+
 
 def test_rank_mixed_types(ranker):
     data = [10, "20", "abc", None, 5.5]
     result = ranker.rank(data, method="average")
     assert len(result) == 5
-    # "abc" and None become NaN → sentinel → lowest rank
+    # Values that cannot be converted are treated as missing and ranked first.
     assert result[2] == 1.0
     assert result[3] == 1.0
 
@@ -54,12 +49,8 @@ def test_rank_with_nan(ranker):
     data = [10, np.nan, 5]
     result = ranker.rank(data, method="dense")
     assert len(result) == 3
-    assert result[1] == 1  # NaN → sentinel → lowest rank
+    assert result[1] == 1  # Missing entries receive the lowest rank.
 
-
-# ---------------------------------------------------------
-# EXCEPTION HANDLING — RANK
-# ---------------------------------------------------------
 
 def test_rank_invalid_method(ranker):
     with pytest.raises(ValueError) as exc:
@@ -91,10 +82,6 @@ def test_rank_empty_array(ranker):
     assert "empty" in str(exc.value)
 
 
-# ---------------------------------------------------------
-# VALID INPUT TESTS — PERCENTILE
-# ---------------------------------------------------------
-
 def test_percentile_linear(ranker):
     data = [10, 20, 30, 40]
     result = ranker.percentile(data, 50, interpolation="linear")
@@ -119,10 +106,6 @@ def test_percentile_midpoint(ranker):
     assert result == 15
 
 
-# ---------------------------------------------------------
-# MIXED DATA TESTS — PERCENTILE
-# ---------------------------------------------------------
-
 def test_percentile_mixed_types(ranker):
     data = [10, "20", "abc", None, 5.5]
     result = ranker.percentile(data, 50)
@@ -135,9 +118,15 @@ def test_percentile_with_nan(ranker):
     assert result == 15.0
 
 
-# ---------------------------------------------------------
-# EXCEPTION HANDLING — PERCENTILE
-# ---------------------------------------------------------
+@pytest.mark.parametrize(("q", "expected"), [(0, 10.0), (100, 40.0)])
+def test_percentile_at_endpoints(ranker, q, expected):
+    assert ranker.percentile([10, 20, 30, 40], q) == expected
+
+
+def test_percentile_rejects_data_with_no_numeric_values(ranker):
+    with pytest.raises(ValueError, match="no valid numeric values"):
+        ranker.percentile(["invalid", None], 50)
+
 
 def test_percentile_invalid_interpolation(ranker):
     with pytest.raises(ValueError) as exc:

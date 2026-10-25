@@ -1,3 +1,5 @@
+"""Check scaling, missing-value imputation, and categorical encoding."""
+
 import numpy as np
 import pytest
 from numcompute.preprocessing import (
@@ -8,12 +10,11 @@ from numcompute.preprocessing import (
 )
 
 
-# =====================================================================
-# StandardScaler Tests (Tests 1 - 4)
-# =====================================================================
+# StandardScaler
+
 
 def test_standard_scaler_normal():
-    """1. Test standard scaling on a normal 1D array."""
+    """Standardize values so their mean is zero and standard deviation is one."""
     X = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
@@ -23,7 +24,7 @@ def test_standard_scaler_normal():
 
 
 def test_standard_scaler_constant():
-    """2. Test scaling a constant array (zero variance should not divide by zero)."""
+    """A constant feature should become zeros without dividing by zero."""
     X = np.array([5.0, 5.0, 5.0, 5.0])
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
@@ -33,7 +34,7 @@ def test_standard_scaler_constant():
 
 
 def test_standard_scaler_separate_train_test():
-    """3. Test that transform uses training parameters on unseen test data."""
+    """Transform new values with statistics learned from the training data."""
     X_train = np.array([0.0, 10.0])  # mean = 5.0, std = 5.0
     X_test = np.array([15.0, 25.0])
 
@@ -45,18 +46,17 @@ def test_standard_scaler_separate_train_test():
 
 
 def test_standard_scaler_unfitted_error():
-    """4. Test that calling transform before fit raises a ValueError."""
+    """Reject transforming data before the scaler has been fitted."""
     scaler = StandardScaler()
     with pytest.raises(ValueError, match="not fitted yet"):
         scaler.transform(np.array([1.0, 2.0, 3.0]))
 
 
-# =====================================================================
-# MinMaxScaler Tests (Tests 5 - 7)
-# =====================================================================
+# MinMaxScaler
+
 
 def test_minmax_scaler_default_range():
-    """5. Test MinMaxScaler scaling to the default [0, 1] range."""
+    """Scale the observed minimum and maximum to the default range."""
     X = np.array([-10.0, 0.0, 10.0, 30.0])
     scaler = MinMaxScaler()
     X_scaled = scaler.fit_transform(X)
@@ -67,7 +67,7 @@ def test_minmax_scaler_default_range():
 
 
 def test_minmax_scaler_custom_range():
-    """6. Test MinMaxScaler scaling to a custom feature_range=(-1, 1)."""
+    """Allow scaling into a caller-selected range."""
     X = np.array([0.0, 5.0, 10.0])
     scaler = MinMaxScaler(feature_range=(-1.0, 1.0))
     X_scaled = scaler.fit_transform(X)
@@ -76,7 +76,7 @@ def test_minmax_scaler_custom_range():
 
 
 def test_minmax_scaler_constant():
-    """7. Test MinMaxScaler on a constant array (range = 0 should not crash)."""
+    """A constant feature should map to the lower end of the selected range."""
     X = np.array([7.0, 7.0, 7.0])
     scaler = MinMaxScaler(feature_range=(2.0, 5.0))
     X_scaled = scaler.fit_transform(X)
@@ -85,23 +85,22 @@ def test_minmax_scaler_constant():
     np.testing.assert_allclose(X_scaled, np.array([2.0, 2.0, 2.0]))
 
 
-# =====================================================================
-# Imputer Tests (Tests 8 - 12)
-# =====================================================================
+# Imputer
+
 
 def test_imputer_mean_nan():
-    """8. Test Imputer replacing np.nan with the mean of valid elements."""
+    """Replace missing values with the mean of observed values."""
     X = np.array([1.0, np.nan, 3.0, np.nan, 5.0])
-    imputer = Imputer(strategy='mean')
+    imputer = Imputer(strategy="mean")
     X_imputed = imputer.fit_transform(X)
 
     np.testing.assert_allclose(X_imputed, np.array([1.0, 3.0, 3.0, 3.0, 5.0]))
 
 
 def test_imputer_median_nan():
-    """9. Test Imputer replacing np.nan with the median (robust to outliers)."""
+    """Use the median when outliers could skew the replacement value."""
     X = np.array([1.0, 2.0, 100.0, np.nan])
-    imputer = Imputer(strategy='median')
+    imputer = Imputer(strategy="median")
     X_imputed = imputer.fit_transform(X)
 
     # Median of [1.0, 2.0, 100.0] is 2.0
@@ -109,78 +108,113 @@ def test_imputer_median_nan():
 
 
 def test_imputer_custom_missing_values_placeholder():
-    """10. Test Imputer when missing values are passed as a custom placeholder (-999.0)."""
+    """Recognize a caller-provided marker for missing numeric values."""
     X = np.array([10.0, -999.0, 20.0, -999.0])
-    imputer = Imputer(strategy='mean', missing_values=-999.0)
+    imputer = Imputer(strategy="mean", missing_values=-999.0)
     X_imputed = imputer.fit_transform(X)
 
     np.testing.assert_allclose(X_imputed, np.array([10.0, 15.0, 20.0, 15.0]))
 
 
+def test_imputer_recognizes_string_and_none_missing_values():
+    values = np.array(["  NaN ", None, "kept"], dtype=object)
+    imputer = Imputer(strategy="constant", fill_value="missing")
+
+    np.testing.assert_array_equal(
+        imputer.fit_transform(values), ["missing", "missing", "kept"]
+    )
+
+
 def test_imputer_constant_and_all_missing_fallback():
-    """11. Test Imputer constant strategy and fallback when all values are missing."""
+    """Use the constant value both by strategy and when no observations exist."""
     X_all_nan = np.array([np.nan, np.nan, np.nan])
-    imputer = Imputer(strategy='mean', fill_value=-1.0)
+    imputer = Imputer(strategy="mean", fill_value=-1.0)
     X_imputed = imputer.fit_transform(X_all_nan)
 
     np.testing.assert_allclose(X_imputed, np.array([-1.0, -1.0, -1.0]))
 
 
 def test_imputer_invalid_strategy():
-    """12. Test Imputer raising ValueError when initialized with an unknown strategy."""
+    """Reject strategies that the imputer does not support."""
     with pytest.raises(ValueError, match="Strategy must be"):
-        Imputer(strategy='most_frequent')
+        Imputer(strategy="most_frequent")
 
 
-# =====================================================================
-# OneHotEncoder & General Edge Case Tests (Tests 13 - 15)
-# =====================================================================
+# One-hot encoding and input edge cases
+
 
 def test_onehot_encoder_normal():
-    """13. Test OneHotEncoder converting 1D integer categories into a 2D binary matrix."""
+    """Turn integer categories into one binary indicator column per category."""
     X = np.array([0, 2, 1, 0])
     encoder = OneHotEncoder()
     X_encoded = encoder.fit_transform(X)
 
-    expected = np.array([
-        [1.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0],
-        [0.0, 1.0, 0.0],
-        [1.0, 0.0, 0.0],
-    ])
+    expected = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0],
+        ]
+    )
     assert X_encoded.shape == (4, 3)
     np.testing.assert_array_equal(X_encoded, expected)
 
 
+def test_onehot_encoder_supports_object_integer_categories():
+    values = np.array([10, 1000000, 10], dtype=object)
+
+    encoded = OneHotEncoder().fit_transform(values)
+
+    assert encoded.shape == (3, 2)
+    np.testing.assert_array_equal(encoded, [[1, 0], [0, 1], [1, 0]])
+
+
+def test_onehot_encoder_vectorizes_string_category_lookup():
+    encoder = OneHotEncoder().fit(["red", "blue", "red"])
+
+    encoded = encoder.transform(["blue", "red"])
+
+    np.testing.assert_array_equal(encoded, [[1, 0], [0, 1]])
+    with pytest.raises(ValueError, match="unknown categories"):
+        encoder.transform(["green"])
+
+
 def test_onehot_encoder_invalid_inputs():
-    """14. Test OneHotEncoder rejecting floats, negative categories, and unseen categories."""
+    """Reject unsupported numeric categories and categories not seen during fitting."""
     encoder = OneHotEncoder()
 
-    # Rejects floats
+    # Categories must be integers, not values that only happen to look numeric.
     with pytest.raises(ValueError, match="integer categorical data"):
         encoder.fit(np.array([0.0, 1.5, 2.0]))
 
-    # Rejects negative integers
+    # Negative values are outside the encoder's supported category range.
     with pytest.raises(ValueError, match="non-negative integers"):
         encoder.fit(np.array([-1, 0, 1]))
 
-    # Rejects unseen categories during transform
+    # Transform cannot assign a column to a category that was never learned.
     encoder.fit(np.array([0, 1]))
     with pytest.raises(ValueError, match="unknown categories"):
         encoder.transform(np.array([0, 1, 2]))
 
+    encoder.fit(np.array(["red", "blue"]))
+    with pytest.raises(ValueError, match="string categorical data"):
+        encoder.transform(np.array([1, 2]))
+
 
 def test_preprocessing_non_contiguous_and_invalid_dimensions():
-    """15. Test non-contiguous 1D array strides and rejection of 2D arrays."""
-    # Non-contiguous slice (step=2)
+    """Handle strided input while still rejecting arrays with multiple dimensions."""
+    # This view skips every other item rather than copying into a new array.
     base = np.array([10.0, 99.0, 20.0, 99.0, 30.0, 99.0])
     X_strided = base[::2]  # [10.0, 20.0, 30.0]
-    assert not X_strided.flags['C_CONTIGUOUS']
+    assert not X_strided.flags["C_CONTIGUOUS"]
 
     scaler = MinMaxScaler()
-    np.testing.assert_allclose(scaler.fit_transform(X_strided), np.array([0.0, 0.5, 1.0]))
+    np.testing.assert_allclose(
+        scaler.fit_transform(X_strided), np.array([0.0, 0.5, 1.0])
+    )
 
-    # 2D array must raise ValueError
+    # The transformer accepts one feature at a time.
     X_2d = np.array([[1.0, 2.0], [3.0, 4.0]])
     with pytest.raises(ValueError, match="X must be a 1D array"):
         scaler.fit(X_2d)
