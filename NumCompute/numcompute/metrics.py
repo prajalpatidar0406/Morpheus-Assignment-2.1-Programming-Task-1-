@@ -1,8 +1,36 @@
 import numpy as np
+import numpy.typing as npt
+from numpy.typing import NDArray
 
 
-def _validate_labels(y_true, y_pred):
-    """Validate and return equally shaped, non-empty 1D label arrays."""
+def _validate_labels(
+    y_true: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
+) -> tuple[NDArray, NDArray]:
+    """
+    Validate true and predicted labels.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Actual class labels.
+    y_pred : array-like
+        Predicted class labels.
+
+    Returns
+    -------
+    tuple of numpy.ndarray
+        Validated true and predicted label arrays.
+
+    Raises
+    ------
+    ValueError
+        If either input is not one-dimensional, is empty, has a
+        mismatched shape, or contains NaN or infinity in a
+        floating-point or complex array.
+
+    Complexity: O(n) time and O(n) space for n labels.
+    """
     true = np.asarray(y_true)
     pred = np.asarray(y_pred)
 
@@ -24,8 +52,35 @@ def _validate_labels(y_true, y_pred):
     return true, pred
 
 
-def _safe_divide(numerator, denominator, zero_division=0):
-    """Divide safely when the denominator is zero."""
+def _safe_divide(
+    numerator: int | float,
+    denominator: int | float,
+    zero_division: int = 0,
+) -> float:
+    """
+    Divide two values while handling a zero denominator.
+
+    Parameters
+    ----------
+    numerator : int or float
+        Numerator of the division.
+    denominator : int or float
+        Denominator of the division.
+    zero_division : int, default=0
+        Value to return when the denominator is zero. Must be 0 or 1.
+
+    Returns
+    -------
+    float
+        Division result, or zero_division if the denominator is zero.
+
+    Raises
+    ------
+    ValueError
+        If zero_division is not 0 or 1.
+
+    Complexity: O(1) time and O(1) space.
+    """
     if zero_division not in (0, 1):
         raise ValueError("zero_division must be 0 or 1")
 
@@ -35,22 +90,72 @@ def _safe_divide(numerator, denominator, zero_division=0):
     return float(numerator / denominator)
 
 
-def accuracy(y_true, y_pred):
-    """Return the fraction of correct predictions."""
+def accuracy(
+    y_true: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
+) -> float:
+    """
+    Calculate the fraction of correct predictions.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Actual class labels.
+    y_pred : array-like
+        Predicted class labels, with the same shape as y_true.
+
+    Returns
+    -------
+    float
+        Number of correct predictions divided by total predictions.
+
+    Raises
+    ------
+    ValueError
+        If the arrays are empty, not one-dimensional, or have
+        different shapes.
+
+    Complexity: O(n) time for n predictions.
+    """
     true, pred = _validate_labels(y_true, y_pred)
     return float(np.mean(true == pred))
 
 
-def confusion_matrix(y_true, y_pred, labels=None):
-    """Return a confusion matrix with true labels in rows.
+def confusion_matrix(
+    y_true: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
+    labels: npt.ArrayLike | None = None,
+) -> NDArray[np.int64]:
+    """Calculate the confusion matrix for classification predictions.
 
-    Rows represent actual labels; columns represent predicted labels.
-    If labels is omitted, all observed labels are included in sorted order.
+    Parameters
+    ----------
+    y_true : array-like
+        Actual class labels.
+    y_pred : array-like
+        Predicted class labels.
+    labels : array-like, optional
+        Ordered list of class labels to include. If omitted, observed
+        labels from both arrays are sorted automatically.
+
+    Returns
+    -------
+    numpy.ndarray
+        Integer matrix where rows represent actual classes and columns
+        represent predicted classes.
+
+    Raises
+    ------
+    ValueError
+        If the input arrays are invalid, labels are empty or duplicated,
+        or an observed label is missing from the provided labels.
+
+    Complexity: O(n + k^2) time, where n is the number of samples and
+    k is the number of classes.
     """
     true, pred = _validate_labels(y_true, y_pred)
 
     if labels is None:
-        # Include labels that appear only in predictions as well.
         labels = np.unique(np.concatenate((true, pred)))
     else:
         labels = np.asarray(labels)
@@ -64,25 +169,59 @@ def confusion_matrix(y_true, y_pred, labels=None):
         if np.unique(labels).size != labels.size:
             raise ValueError("labels must not contain duplicates")
 
-    # Map each label to its position in the matrix.
-    label_to_index = {label: i for i, label in enumerate(labels.tolist())}
+    label_to_index = {
+        label: i for i, label in enumerate(labels.tolist())
+    }
     matrix = np.zeros((labels.size, labels.size), dtype=np.int64)
 
     for actual, predicted in zip(true, pred):
         if actual not in label_to_index:
             raise ValueError(f"actual label {actual!r} is not in labels")
-        if predicted not in label_to_index:
-            raise ValueError(f"predicted label {predicted!r} is not in labels")
 
-        matrix[label_to_index[actual], label_to_index[predicted]] += 1
+        if predicted not in label_to_index:
+            raise ValueError(
+                f"predicted label {predicted!r} is not in labels"
+            )
+
+        matrix[
+            label_to_index[actual],
+            label_to_index[predicted],
+        ] += 1
 
     return matrix
 
 
-def precision(y_true, y_pred, positive_label=1, zero_division=0):
-    """Return binary precision for the selected positive label.
+def precision(
+    y_true: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
+    positive_label: object = 1,
+    zero_division: int = 0,
+) -> float:
+    """Calculate binary precision for the selected positive class.
 
-    Precision = TP / (TP + FP)
+    Parameters
+    ----------
+    y_true : array-like
+        Actual class labels.
+    y_pred : array-like
+        Predicted class labels.
+    positive_label : object, default=1
+        Label treated as the positive class.
+    zero_division : int, default=0
+        Value returned when there are no predicted positive samples.
+        Must be 0 or 1.
+
+    Returns
+    -------
+    float
+        Precision value: True positives divided by the sum of true and false positives.
+
+    Raises
+    ------
+    ValueError
+        If the labels are invalid or zero_division is not 0 or 1.
+
+    Complexity: O(n) time for n samples.
     """
     true, pred = _validate_labels(y_true, y_pred)
 
@@ -95,10 +234,38 @@ def precision(y_true, y_pred, positive_label=1, zero_division=0):
     return _safe_divide(tp, tp + fp, zero_division)
 
 
-def recall(y_true, y_pred, positive_label=1, zero_division=0):
-    """Return binary recall for the selected positive label.
+def recall(
+    y_true: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
+    positive_label: object = 1,
+    zero_division: int = 0,
+) -> float:
+    """Calculate binary recall for the selected positive class.
 
-    Recall = TP / (TP + FN)
+    Parameters
+    ----------
+    y_true : array-like
+        Actual class labels.
+    y_pred : array-like
+        Predicted class labels.
+    positive_label : object, default=1
+        Label treated as the positive class.
+    zero_division : int, default=0
+        Value returned when there are no actual positive samples.
+        Must be 0 or 1.
+
+    Returns
+    -------
+    float
+        Recall value: True positives divided by the sum of true positives and
+        false negatives.
+
+    Raises
+    ------
+    ValueError
+        If the labels are invalid or zero_division is not 0 or 1.
+
+    Complexity: O(n) time for n samples.
     """
     true, pred = _validate_labels(y_true, y_pred)
 
@@ -111,15 +278,48 @@ def recall(y_true, y_pred, positive_label=1, zero_division=0):
     return _safe_divide(tp, tp + fn, zero_division)
 
 
-def f1(y_true, y_pred, positive_label=1, zero_division=0):
-    """Return the binary F1 score."""
+def f1(
+    y_true: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
+    positive_label: object = 1,
+    zero_division: int = 0,
+) -> float:
+    """
+    Calculate the binary F1 score.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Actual class labels.
+    y_pred : array-like
+        Predicted class labels.
+    positive_label : object, default=1
+        Label treated as the positive class.
+    zero_division : int, default=0
+        Value returned when a division denominator is zero.
+        Must be 0 or 1.
+
+    Returns
+    -------
+    float
+        Harmonic mean of precision and recall.
+
+    Raises
+    ------
+    ValueError
+        If the labels are invalid or zero_division is not 0 or 1.
+
+    Complexity: O(n) time for n samples.
+    """
     p = precision(
-        y_true, y_pred,
+        y_true,
+        y_pred,
         positive_label=positive_label,
         zero_division=zero_division,
     )
     r = recall(
-        y_true, y_pred,
+        y_true,
+        y_pred,
         positive_label=positive_label,
         zero_division=zero_division,
     )
@@ -127,8 +327,36 @@ def f1(y_true, y_pred, positive_label=1, zero_division=0):
     return _safe_divide(2 * p * r, p + r, zero_division)
 
 
-def mse(y_true, y_pred):
-    """Return mean squared error for numeric regression targets."""
+def mse(
+    y_true: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
+) -> float:
+    """
+    Calculate mean squared error for regression predictions.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Actual numeric target values.
+    y_pred : array-like
+        Predicted numeric target values, matching y_true in shape.
+
+    Returns
+    -------
+    float
+        Mean of the squared differences between actual and predicted
+        values.
+
+    Raises
+    ------
+    TypeError
+        If either input contains non-real numeric values.
+    ValueError
+        If the arrays have different shapes, are empty, or contain
+        NaN or infinity.
+
+    Complexity: O(n) time for n target values.
+    """
     true = np.asarray(y_true)
     pred = np.asarray(y_pred)
 
@@ -150,27 +378,40 @@ def mse(y_true, y_pred):
     return float(np.mean((true - pred) ** 2))
 
 
-def roc_curve(y_true, y_score, positive_label=1):
-    """Compute ROC curve points for binary classification.
+def roc_curve(
+    y_true: npt.ArrayLike,
+    y_score: npt.ArrayLike,
+    positive_label: object = 1,
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+    """
+    Calculate ROC curve points for binary classification.
 
     Parameters
     ----------
     y_true : array-like
-        True binary class labels.
+        Actual binary class labels.
     y_score : array-like
-        Numeric scores or probabilities for the positive class.
-        Higher scores indicate a stronger prediction of the positive class.
-    positive_label : scalar, default=1
-        Label identifying the positive class.
+        Numeric scores for the positive class. Higher values indicate
+        a stronger prediction of the positive class.
+    positive_label : object, default=1
+        Label treated as the positive class.
 
     Returns
     -------
-    fpr : numpy.ndarray
-        False positive rates.
-    tpr : numpy.ndarray
-        True positive rates.
-    thresholds : numpy.ndarray
-        Descending score thresholds. The first threshold is infinity.
+    tuple of numpy.ndarray
+        False positive rates, true positive rates, and descending
+        classification thresholds. The first threshold is infinity.
+
+    Raises
+    ------
+    TypeError
+        If y_score contains non-real numeric values.
+    ValueError
+        If inputs are empty, not one-dimensional, have different shapes,
+        contain non-finite values, or y_true does not contain exactly
+        two classes.
+
+    Complexity: O(n log n) time due to sorting n prediction scores.
     """
     true = np.asarray(y_true)
     scores = np.asarray(y_score)
@@ -207,24 +448,22 @@ def roc_curve(y_true, y_score, positive_label=1):
     n_positive = np.count_nonzero(is_positive)
     n_negative = true.size - n_positive
 
-    # Sort scores from highest to lowest.
     order = np.argsort(scores, kind="stable")[::-1]
     sorted_scores = scores[order]
     sorted_positive = is_positive[order]
 
-    # Calculate cumulative true and false positives.
     cumulative_tp = np.cumsum(sorted_positive)
     cumulative_fp = np.cumsum(~sorted_positive)
 
-    # Keep the last observation at each distinct score, so tied scores
-    # are handled together rather than treated as separate thresholds.
     distinct_indices = np.where(np.diff(sorted_scores) != 0)[0]
-    threshold_indices = np.r_[distinct_indices, sorted_scores.size - 1]
+    threshold_indices = np.r_[
+        distinct_indices,
+        sorted_scores.size - 1,
+    ]
 
     tp = cumulative_tp[threshold_indices]
     fp = cumulative_fp[threshold_indices]
 
-    # Include the starting point (0, 0).
     tpr = np.r_[0.0, tp / n_positive]
     fpr = np.r_[0.0, fp / n_negative]
     thresholds = np.r_[np.inf, sorted_scores[threshold_indices]]
@@ -232,53 +471,107 @@ def roc_curve(y_true, y_score, positive_label=1):
     return fpr, tpr, thresholds
 
 
-def auc(x, y):
-    """Calculate the area under a curve using the trapezoidal rule.
+def auc(
+    x: npt.ArrayLike,
+    y: npt.ArrayLike,
+) -> float:
+    """
+    Calculate the area under a curve using the trapezoidal rule.
 
     Parameters
     ----------
-    x, y : array-like
-        Coordinates of the curve. Both arrays must be 1D, have equal
-        lengths, and contain at least two finite values. The x values
-        must be monotonic.
+    x : array-like
+        Monotonic x-coordinates of the curve.
+    y : array-like
+        Corresponding y-coordinates.
 
     Returns
     -------
     float
-        Area under the curve, returned as a non-negative value.
-    """
-    x = np.asarray(x)
-    y = np.asarray(y)
+        Non-negative area under the curve.
 
-    if x.ndim != 1 or y.ndim != 1:
+    Raises
+    ------
+    TypeError
+        If x or y contains non-real numeric values.
+    ValueError
+        If the inputs are not one-dimensional, have different lengths,
+        contain fewer than two points, contain non-finite values,
+        or x is not monotonic.
+
+    Complexity: O(n) time for n curve points.
+    """
+    x_arr = np.asarray(x)
+    y_arr = np.asarray(y)
+
+    if x_arr.ndim != 1 or y_arr.ndim != 1:
         raise ValueError("x and y must be 1D arrays")
 
-    if x.size != y.size:
+    if x_arr.size != y_arr.size:
         raise ValueError("x and y must have the same length")
 
-    if x.size < 2:
+    if x_arr.size < 2:
         raise ValueError("at least two points are required")
 
-    if x.dtype.kind not in "iuf" or y.dtype.kind not in "iuf":
+    if x_arr.dtype.kind not in "iuf" or y_arr.dtype.kind not in "iuf":
         raise TypeError("x and y must contain real numeric values")
 
-    x = x.astype(float, copy=False)
-    y = y.astype(float, copy=False)
+    x_arr = x_arr.astype(float, copy=False)
+    y_arr = y_arr.astype(float, copy=False)
 
-    if not np.all(np.isfinite(x)) or not np.all(np.isfinite(y)):
+    if (
+        not np.all(np.isfinite(x_arr))
+        or not np.all(np.isfinite(y_arr))
+    ):
         raise ValueError("x and y must not contain NaN or infinity")
 
-    differences = np.diff(x)
+    differences = np.diff(x_arr)
 
-    if not (np.all(differences >= 0) or np.all(differences <= 0)):
+    if not (
+        np.all(differences >= 0)
+        or np.all(differences <= 0)
+    ):
         raise ValueError("x values must be monotonic")
 
-    return float(abs(np.trapezoid(y, x)))
+    return float(abs(np.trapezoid(y_arr, x_arr)))
 
 
-def roc_auc_score(y_true, y_score, positive_label=1):
-    """Compute the area under the ROC curve for binary classification."""
+def roc_auc_score(
+    y_true: npt.ArrayLike,
+    y_score: npt.ArrayLike,
+    positive_label: object = 1,
+) -> float:
+    """
+    Calculate the area under the receiver operating characteristic curve.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Actual binary class labels.
+    y_score : array-like
+        Numeric scores for the positive class.
+    positive_label : object, default=1
+        Label treated as the positive class.
+
+    Returns
+    -------
+    float
+        ROC AUC score, generally between 0 and 1.
+
+    Raises
+    ------
+    TypeError
+        If y_score contains non-real numeric values.
+    ValueError
+        If the ROC curve inputs are invalid or y_true does not contain
+        exactly two classes.
+
+    Complexity: O(n log n) time for n prediction scores.
+    """
     fpr, tpr, _ = roc_curve(
-        y_true, y_score, positive_label=positive_label
+        y_true,
+        y_score,
+        positive_label=positive_label,
     )
+
     return auc(fpr, tpr)
