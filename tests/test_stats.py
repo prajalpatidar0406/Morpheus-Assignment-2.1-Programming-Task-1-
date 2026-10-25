@@ -1,9 +1,16 @@
-"""Behavior and edge-case tests for descriptive statistics."""
-
 import numpy as np
 import pytest
 
-from numcompute.stats import histogram, maximum, mean, median, minimum, percentile, quantile, std
+from numcompute.stats import (
+    histogram,
+    maximum,
+    mean,
+    median,
+    minimum,
+    percentile,
+    quantile,
+    std
+)
 
 
 def test_mean_of_a_simple_list() -> None:
