@@ -81,7 +81,7 @@ The project does not uses any external ML/DL libraries such as:
 Clone the repository and move into its root directory:
 
 ```bash
-git clone [https://github.com/prajalpatidar0406/Morpheus-Assignment-2.1-Programming-Task-1-.git](https://github.com/prajalpatidar0406/Morpheus-Assignment-2.1-Programming-Task-1-.git)
+git clone https://github.com/prajalpatidar0406/Morpheus-Assignment-2.1-Programming-Task-1-.git
 cd Morpheus-Assignment-2.1-Programming-Task-1-
 ```
 
